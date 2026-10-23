@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openshell-deep-research.invalid/v1/job-request.schema.json",
+  "title": "Research job request",
+  "description": "Untrusted browser request; no tenant, user, scopes, or raw credentials are accepted.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["question", "mode", "sources", "budget_tier"],
+  "properties": {
+    "question": {"type": "string", "minLength": 10, "maxLength": 12000},
+    "private_context": {
+      "type": "string", "maxLength": 20000,
+      "description": "Optional user context. It is never copied into a combined job's public stage."
+    },
+    "public_research_brief": {
+      "type": "string", "minLength": 20, "maxLength": 2000,
+      "description": "For combined jobs, a proposed public-safe brief; the server must review it before a public stage starts."
+    },
+    "mode": {"type": "string", "enum": ["public", "enterprise", "combined"]},
+    "sources": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 20,
+      "items": {"$ref": "source-selection.schema.json"}
+    },
+    "budget_tier": {"type": "string", "enum": ["shallow", "standard", "deep"]},
+    "model_preference": {"type": "string", "minLength": 1, "maxLength": 120},
+    "output_format": {"type": "string", "const": "markdown"},
+    "time_range": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start", "end"],
+      "properties": {
+        "start": {"type": "string", "format": "date-time"},
+        "end": {"type": "string", "format": "date-time"}
+      },
+      "description": "The API also checks start < end and applies connector-specific limits."
+    }
+  },
+  "if": {"properties": {"mode": {"const": "combined"}}},
+  "then": {"required": ["public_research_brief"]}
+}
+

@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openshell-deep-research.invalid/v1/evidence.schema.json",
+  "title": "Research evidence record",
+  "description": "Immutable evidence metadata. The full source payload is stored separately under tenant-aware access controls.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "evidence_id", "job_id", "tool_call_id", "connector", "resource_uri",
+    "retrieved_at", "content_sha256", "artifact_ref", "classification",
+    "access_context_ref"
+  ],
+  "properties": {
+    "evidence_id": {"type": "string", "format": "uuid"},
+    "job_id": {"type": "string", "format": "uuid"},
+    "tool_call_id": {"type": "string", "format": "uuid"},
+    "connector": {
+      "type": "string",
+      "enum": ["public_web", "slack", "github", "gcp_logging", "custom_mcp"]
+    },
+    "resource_uri": {"type": "string", "format": "uri", "maxLength": 2000},
+    "source_locator": {"type": "string", "maxLength": 1000},
+    "title": {"type": "string", "maxLength": 1000},
+    "source_published_at": {"type": "string", "format": "date-time"},
+    "retrieved_at": {"type": "string", "format": "date-time"},
+    "content_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "artifact_ref": {
+      "type": "string", "minLength": 1, "maxLength": 300,
+      "description": "Opaque reference to an encrypted server-side source snapshot, not a signed download URL."
+    },
+    "excerpt": {"type": "string", "maxLength": 4000},
+    "source_span": {"type": "string", "minLength": 1, "maxLength": 300},
+    "classification": {
+      "type": "string",
+      "enum": ["public", "internal", "confidential", "restricted"]
+    },
+    "access_context_ref": {
+      "type": "string", "minLength": 1, "maxLength": 300,
+      "description": "Opaque server-side authorization context identifier; never a bearer token."
+    },
+    "retention_expires_at": {"type": "string", "format": "date-time"},
+    "upstream_tool": {"type": "string", "maxLength": 120}
+  },
+  "anyOf": [
+    {"required": ["excerpt"]},
+    {"required": ["source_span"]}
+  ]
+}
+

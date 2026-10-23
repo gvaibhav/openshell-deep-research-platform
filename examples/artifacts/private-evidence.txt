@@ -1,0 +1,1 @@
+The query timeout was increased from 5 seconds to 30 seconds.

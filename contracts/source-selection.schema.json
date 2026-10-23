@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openshell-deep-research.invalid/v1/source-selection.schema.json",
+  "title": "Source selection",
+  "description": "A requested or approved resource set for one connector. Authorization is checked server-side.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["connector", "resource_ids"],
+  "properties": {
+    "connector": {
+      "type": "string",
+      "enum": ["public_web", "slack", "github", "gcp_logging", "custom_mcp"]
+    },
+    "connection_ref": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "description": "Opaque reference to a server-held user or service connection; never a token."
+    },
+    "resource_ids": {
+      "type": "array",
+      "maxItems": 100,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1, "maxLength": 500}
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"connector": {"const": "public_web"}}},
+      "then": {
+        "properties": {"resource_ids": {"maxItems": 0}},
+        "not": {"required": ["connection_ref"]}
+      },
+      "else": {
+        "required": ["connection_ref"],
+        "properties": {"resource_ids": {"minItems": 1}}
+      }
+    }
+  ]
+}
+

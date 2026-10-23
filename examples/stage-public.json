@@ -1,0 +1,32 @@
+{
+  "manifest_id": "77777777-7777-4777-8777-777777777777",
+  "job_id": "11111111-1111-4111-8111-111111111111",
+  "attempt_id": "99999999-9999-4999-8999-999999999999",
+  "sandbox_id": "sandbox-public-example-1",
+  "fencing_generation": 1,
+  "policy_version": 1,
+  "stage": "public",
+  "research_brief": "Research public documentation on query latency causes and common mitigation patterns in distributed services.",
+  "issued_at": "2026-10-23T12:00:00Z",
+  "expires_at": "2026-10-23T12:15:00Z",
+  "approved_sources": [
+    {
+      "connector": "public_web",
+      "resource_ids": []
+    }
+  ],
+  "allowed_tools": ["search_public_web", "fetch_public_page"],
+  "model_route": "approved-enterprise-model",
+  "classification": "public",
+  "limits": {
+    "wall_time_seconds": 900,
+    "max_model_tokens": 30000,
+    "max_tool_calls": 50,
+    "max_source_bytes": 10485760,
+    "max_output_bytes": 2097152,
+    "max_sources": 20,
+    "max_subagents": 1,
+    "max_estimated_cost_usd": 3.0
+  },
+  "context_evidence_ids": []
+}

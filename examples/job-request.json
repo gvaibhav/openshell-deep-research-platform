@@ -1,0 +1,32 @@
+{
+  "question": "What caused the recent research-service latency incident, and how was it resolved? Compare public documentation with the selected repository, incident channel, and application logs.",
+  "public_research_brief": "Research public documentation on query latency causes and common mitigation patterns in distributed services.",
+  "mode": "combined",
+  "sources": [
+    {
+      "connector": "public_web",
+      "resource_ids": []
+    },
+    {
+      "connector": "github",
+      "connection_ref": "conn_github_example",
+      "resource_ids": ["example-org/research-service"]
+    },
+    {
+      "connector": "slack",
+      "connection_ref": "conn_slack_example",
+      "resource_ids": ["C0123456789"]
+    },
+    {
+      "connector": "gcp_logging",
+      "connection_ref": "conn_gcp_example",
+      "resource_ids": ["projects/example-prod"]
+    }
+  ],
+  "budget_tier": "standard",
+  "output_format": "markdown",
+  "time_range": {
+    "start": "2026-10-01T00:00:00Z",
+    "end": "2026-10-23T00:00:00Z"
+  }
+}

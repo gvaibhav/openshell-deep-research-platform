@@ -1,0 +1,331 @@
+openapi: 3.1.0
+info:
+  title: OpenShell Deep Research job API
+  version: 0.1.0-design
+  description: >-
+    Proposed browser-facing job API. The BFF authenticates users with Okta
+    Authorization Code plus PKCE and uses a secure HttpOnly session cookie.
+    All requests recheck tenant and job authorization; mutation endpoints also
+    require CSRF protection. This file does not define internal worker or broker APIs.
+servers:
+  - url: https://research.example.invalid
+security:
+  - dashboardSession: []
+paths:
+  /v1/jobs:
+    post:
+      operationId: submitJob
+      summary: Submit a research job
+      description: >-
+        Validate user/session, selected source connections, public brief when
+        applicable, policy, quotas, and idempotency before accepting a job.
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ./job-request.schema.json
+      responses:
+        '202':
+          description: Job admitted durably; queue publication may still be pending
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobAccepted'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+    get:
+      operationId: listJobs
+      summary: List jobs visible to the signed-in user
+      parameters:
+        - in: query
+          name: cursor
+          schema:
+            type: string
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Authorized page of job summaries
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/JobStatus'
+                  next_cursor:
+                    type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /v1/jobs/{job_id}:
+    parameters:
+      - $ref: '#/components/parameters/JobId'
+    get:
+      operationId: getJob
+      summary: Get the authoritative job snapshot
+      responses:
+        '200':
+          description: Current job state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobStatus'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /v1/jobs/{job_id}/events:
+    parameters:
+      - $ref: '#/components/parameters/JobId'
+    get:
+      operationId: streamJobEvents
+      summary: Stream authorized, sanitized job events
+      description: >-
+        Server-sent events. Each data field is JSON matching
+        job-event.schema.json; the SSE id is the monotonically increasing
+        sequence. The client can reconnect using Last-Event-ID, then fetch
+        GET /v1/jobs/{job_id} to reconcile gaps.
+      parameters:
+        - in: header
+          name: Last-Event-ID
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Server-sent event stream
+          content:
+            text/event-stream:
+              schema:
+                type: string
+              x-event-schema: ./job-event.schema.json
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /v1/jobs/{job_id}/cancel:
+    parameters:
+      - $ref: '#/components/parameters/JobId'
+    post:
+      operationId: cancelJob
+      summary: Request idempotent cancellation
+      description: >-
+        Fences the active attempt and revokes broker authority. Repeating the
+        request returns the same terminal or cancellation-in-progress state.
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '202':
+          description: Cancellation accepted or already requested
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobStatus'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /v1/jobs/{job_id}/report:
+    parameters:
+      - $ref: '#/components/parameters/JobId'
+    get:
+      operationId: getReport
+      summary: Get an authorized, evidence-backed report
+      description: >-
+        Recheck report visibility and source-derived access at read time.
+        A completed job may still deny some evidence to a later viewer.
+      responses:
+        '200':
+          description: Final report
+          content:
+            application/json:
+              schema:
+                $ref: ./report.schema.json
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /v1/jobs/{job_id}/evidence/{evidence_id}:
+    parameters:
+      - $ref: '#/components/parameters/JobId'
+      - $ref: '#/components/parameters/EvidenceId'
+    get:
+      operationId: getEvidence
+      summary: Get authorized evidence metadata and bounded excerpt
+      description: >-
+        Recheck tenant, job, and source-derived visibility. An artifact_ref is
+        an opaque internal identifier, not a public or signed download URL.
+      responses:
+        '200':
+          description: Evidence metadata
+          content:
+            application/json:
+              schema:
+                $ref: ./evidence.schema.json
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+components:
+  securitySchemes:
+    dashboardSession:
+      type: apiKey
+      in: cookie
+      name: __Host-dr_session
+      description: Secure, HttpOnly, SameSite BFF session established after Okta PKCE.
+  parameters:
+    JobId:
+      in: path
+      name: job_id
+      required: true
+      schema:
+        type: string
+        format: uuid
+    EvidenceId:
+      in: path
+      name: evidence_id
+      required: true
+      schema:
+        type: string
+        format: uuid
+    CsrfHeader:
+      in: header
+      name: X-CSRF-Token
+      required: true
+      schema:
+        type: string
+      description: BFF-issued CSRF token bound to the session and checked with Origin.
+    IdempotencyKey:
+      in: header
+      name: Idempotency-Key
+      required: true
+      schema:
+        type: string
+        minLength: 16
+        maxLength: 128
+  schemas:
+    JobAccepted:
+      type: object
+      additionalProperties: false
+      required: [job_id, status]
+      properties:
+        job_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [authorized, queued]
+    JobStatus:
+      type: object
+      additionalProperties: false
+      required: [job_id, status, created_at, updated_at, event_sequence]
+      properties:
+        job_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+            - submitted
+            - authorized
+            - queued
+            - provisioning
+            - running
+            - awaiting_review
+            - completing
+            - completed
+            - failed
+            - canceled
+            - expired
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        event_sequence:
+          type: integer
+          minimum: 0
+        reason_code:
+          type: string
+          maxLength: 120
+        report_available:
+          type: boolean
+    ApiError:
+      type: object
+      additionalProperties: false
+      required: [code, message, correlation_id]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        correlation_id:
+          type: string
+  responses:
+    BadRequest:
+      description: Invalid request or rejected public-safe brief
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    Unauthorized:
+      description: Missing or expired dashboard session
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    Forbidden:
+      description: Source or budget policy denied the request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    NotFound:
+      description: No visible resource with this identifier
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    Conflict:
+      description: State or idempotency conflict
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    RateLimited:
+      description: User or tenant quota exceeded
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+            minimum: 0
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'

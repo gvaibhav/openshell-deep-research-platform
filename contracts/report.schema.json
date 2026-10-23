@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openshell-deep-research.invalid/v1/report.schema.json",
+  "title": "Evidence-backed research report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["job_id", "generated_at", "question", "title", "summary", "findings", "limitations", "classification"],
+  "properties": {
+    "job_id": {"type": "string", "format": "uuid"},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "question": {"type": "string", "minLength": 10, "maxLength": 12000},
+    "title": {"type": "string", "minLength": 1, "maxLength": 500},
+    "summary": {
+      "type": "string", "minLength": 1, "maxLength": 20000,
+      "description": "Short answer to question; the verifier checks its material claims against findings."
+    },
+    "findings": {
+      "type": "array",
+      "maxItems": 1000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["claim", "evidence_ids"],
+        "properties": {
+          "claim": {"type": "string", "minLength": 1, "maxLength": 10000},
+          "evidence_ids": {
+            "type": "array", "minItems": 1, "maxItems": 100, "uniqueItems": true,
+            "items": {"type": "string", "format": "uuid"}
+          },
+          "confidence": {"type": "string", "enum": ["high", "medium", "low"]}
+        }
+      }
+    },
+    "limitations": {
+      "type": "array", "maxItems": 100,
+      "items": {"type": "string", "minLength": 1, "maxLength": 2000}
+    },
+    "classification": {
+      "type": "string",
+      "enum": ["public", "internal", "confidential", "restricted"]
+    }
+  }
+}
+

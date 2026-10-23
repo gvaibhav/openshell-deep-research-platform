@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openshell-deep-research.invalid/v1/job-event.schema.json",
+  "title": "Research job event",
+  "description": "Small event for status streaming; raw source content and credentials are excluded.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["event_id", "job_id", "sequence", "at", "type", "message"],
+  "properties": {
+    "event_id": {"type": "string", "format": "uuid"},
+    "job_id": {"type": "string", "format": "uuid"},
+    "sequence": {"type": "integer", "minimum": 0},
+    "at": {"type": "string", "format": "date-time"},
+    "type": {"type": "string", "enum": ["status", "progress", "evidence", "warning", "error"]},
+    "status": {
+      "type": "string",
+      "enum": ["submitted", "authorized", "queued", "provisioning", "running", "awaiting_review", "completing", "completed", "failed", "canceled", "expired"]
+    },
+    "message": {"type": "string", "minLength": 1, "maxLength": 1000},
+    "evidence_id": {"type": "string", "format": "uuid"},
+    "progress_percent": {"type": "integer", "minimum": 0, "maximum": 100}
+  }
+}
+
