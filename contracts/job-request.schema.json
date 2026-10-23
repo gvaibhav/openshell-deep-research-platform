@@ -5,7 +5,7 @@
   "description": "Untrusted browser request; no tenant, user, scopes, or raw credentials are accepted.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["question", "mode", "sources", "budget_tier"],
+  "required": ["question", "mode", "sources", "budget_tier", "visibility_selection"],
   "properties": {
     "question": {"type": "string", "minLength": 10, "maxLength": 12000},
     "private_context": {
@@ -17,6 +17,10 @@
       "description": "For combined jobs, a proposed public-safe brief; the server must review it before a public stage starts."
     },
     "mode": {"type": "string", "enum": ["public", "enterprise", "combined"]},
+    "visibility_selection": {
+      "$ref": "visibility-selection.schema.json",
+      "description": "Untrusted choice of submitter-only or one approved Okta group. The API validates and binds it at job creation; no browser-supplied owner, tenant, or arbitrary ACL is accepted."
+    },
     "sources": {
       "type": "array",
       "minItems": 1,

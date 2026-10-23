@@ -66,6 +66,35 @@ gatewayConfig:
 
 The PostgreSQL Secret contains a `uri` key and must stay in the gateway release namespace. The default StatefulSet with per-Pod SQLite is a **single-replica** option; two or more replicas require a Deployment and shared PostgreSQL. Place replicas on different failure domains, add a separately managed PodDisruptionBudget, and size PostgreSQL connections for rollout overlap. Gateway peer routing handles supervisor ownership; a killed gateway can still interrupt an in-flight stream, so callers must reconnect or retry safely. [OpenShell high availability](https://docs.nvidia.com/openshell/v0.1.5/kubernetes/high-availability).
 
+### Build security and CVE gate
+
+Implement [OPS-10](../requirements.md#55-operations-and-governance) when the first executable service and CI pipeline are added. This repository currently has no application dependency lockfiles, Dockerfiles, images, or CI; `make check` validates design artifacts only. Ranged `requirements-dev.txt` entries are not an inventory of the exact packages in a candidate build. The organization may use its approved scanner stack; [pip-audit](https://github.com/pypa/pip-audit), [npm audit](https://docs.npmjs.com/cli/commands/npm-audit/), and [Trivy](https://trivy.dev/docs/latest/scanner/vulnerability/) are candidate tools, not a claim that they are configured here.
+
+```mermaid
+flowchart LR
+    PR[Pull request] --> Lock[Resolve and audit dependency locks]
+    Lock --> Static[Secret and configuration checks]
+    Static --> Build[Build immutable candidate images]
+    Build --> Inventory[SBOM for each final digest]
+    Inventory --> Scan[CVE scan of final digests]
+    Scan --> Gate{Coverage and finding policy pass?}
+    Gate -->|Yes| Promote[Promote the same digests]
+    Gate -->|No| Triage[Patch or seek scoped exception]
+    Triage -->|Patch| Build
+    Triage -->|Approved exception| Gate
+    Promote --> Rescan[Daily and urgent deployed-digest rescan]
+    Rescan -->|New applicable finding| Triage
+```
+
+| Checkpoint | Required evidence |
+| --- | --- |
+| Pull request | Audit the resolved and locked direct, transitive, build, and development packages for each Python and UI component. Compare introduced findings with the accepted baseline. Run secret scanning and changed Docker/Helm/Terraform/Kubernetes **misconfiguration** checks as separate jobs; a configuration finding is not a package CVE. [Trivy misconfiguration scanning](https://trivy.dev/docs/latest/scanner/misconfiguration/). |
+| Candidate build | Scan every final API, dashboard, controller, broker, and worker image **by immutable digest** for OS and language packages. Scan every qualified third-party image that the release deploys, including OpenShell gateway, supervisor, sandbox runtime, and Agent Sandbox controller. Generate a CycloneDX or SPDX SBOM tied to each digest and record scanner version, advisory-database timestamp, coverage, and scan artifact. A source-tree scan cannot substitute for a final-image scan. [Trivy image scanning](https://trivy.dev/docs/latest/guide/target/container_image/), [SBOM generation](https://trivy.dev/docs/latest/guide/supply-chain/sbom/). |
+| Promotion | Fail closed on missing, incomplete, or stale scans. Block an applicable [CISA KEV](https://github.com/cisagov/kev-data) finding at any severity, or an applicable critical/high finding, until fixed or covered by a scoped, time-limited exception approved by the security owner. Track medium/low findings with owner and due date. Record installed package/version, affectedness, vendor advisory or backport evidence, mitigation, scope, owner, and expiry for `not affected` or exception decisions. Do not accept blanket suppressions. These thresholds and the daily cadence below are proposed project policy, subject to enterprise security approval. [Trivy finding filters](https://trivy.dev/docs/latest/configuration/filtering/). |
+| After release | Rescan deployed digests or retained SBOMs at least daily and promptly after urgent advisory updates; create an owned remediation item for new applicable CVEs. Fix by updating a dependency or base image, rebuilding and rescanning a new digest, rerunning affected tests, and promoting that digest. Keep the old artifact and its decision record for audit. |
+
+Preserve the scan and SBOM results alongside build provenance in the release record. A green CVE result does not prove that Okta, broker authorization, OpenShell policy, CNI enforcement, or research prompt-injection behavior is safe; those have separate live gates below. Trivy's OS-package results also require vendor-advisory review because distributions may backport fixes, and its package detection has coverage limits. [Vulnerability scanner behavior](https://trivy.dev/docs/latest/scanner/vulnerability/).
+
 ## 3. Workspace, namespace, and network boundary
 
 ```mermaid
@@ -288,20 +317,22 @@ sequenceDiagram
     R->>Q: Resume by tenant; watch error and relay metrics
 ```
 
-Before upgrading, compare the new stable release's support matrix, migration guide, chart values, provider/profile semantics, and policy schema with the locked release. Run the full integration gates in a production-like staging environment, then pause admissions, drain active jobs where practical, and take restorable backups. Upgrade the Agent Sandbox controller/CRDs separately if required and restart OpenShell gateways afterward. Roll out the gateway first, then launch canary sandboxes using the matching supervisor/runtime pair. Existing sandboxes can keep old images until stopped; record and drain that overlap. [OpenShell support matrix](https://docs.nvidia.com/openshell/v0.1.5/about/support-matrix), [Kubernetes upgrade instructions](https://docs.nvidia.com/openshell/v0.1.5/kubernetes/setup), [dynamic token grant ordering](https://docs.nvidia.com/openshell/v0.1.5/how-it-works/providers/profiles).
+Before upgrading, compare the new stable release's support matrix, migration guide, chart values, provider/profile semantics, and policy schema with the locked release. Scan the exact new image digests and resolve the CVE gate above. Run the full integration gates in a production-like staging environment, then pause admissions, drain active jobs where practical, and take restorable backups. Upgrade the Agent Sandbox controller/CRDs separately if required and restart OpenShell gateways afterward. Roll out the gateway first, then launch canary sandboxes using the matching supervisor/runtime pair. Existing sandboxes can keep old images until stopped; record and drain that overlap. [OpenShell support matrix](https://docs.nvidia.com/openshell/v0.1.5/about/support-matrix), [Kubernetes upgrade instructions](https://docs.nvidia.com/openshell/v0.1.5/kubernetes/setup), [dynamic token grant ordering](https://docs.nvidia.com/openshell/v0.1.5/how-it-works/providers/profiles).
 
 Verify gateway replica readiness, PostgreSQL capacity, peer endpoints, supervisor reconnection, policy revisions, provider receipts, Okta claims, Vault login, CNI canary, broker MCP calls, and evidence writes before raising traffic. Rollback is a tested release procedure, **not** an automatic Helm image reversal after a database or credential migration. Determine schema compatibility first; if incompatible, restore the matched database/secret snapshot and prior artifact set in the rehearsed order. Never run mixed gateway versions against the same provider refresh records during a driver migration. [High availability](https://docs.nvidia.com/openshell/v0.1.5/kubernetes/high-availability), [credential-driver migration](https://docs.nvidia.com/openshell/v0.1.5/how-it-works/gateways/configuration).
 
 ## 10. Promotion integration gates
 
-Each gate has a recorded owner, exact artifact versions/hashes, test job ID, expected outcome, actual evidence link, and sign-off. A gate fails on missing evidence as well as on an observed violation. These are application promotion rules; OpenShell does not run the entire checklist for us.
+Each gate has a recorded owner, exact artifact versions/hashes, expected outcome, actual evidence link, and sign-off. Record a test job ID for runtime gates and build digests/scan IDs for the build gate. A gate fails on missing evidence as well as on an observed violation. These are application promotion rules; OpenShell does not run the entire checklist for us.
 
 | Gate | Required proof |
 | --- | --- |
 | Release and runtime | Chart, gateway, supervisor, runtime, controller, CLI/SDK, worker, Deep Agents, and MCP client match the release manifest; newly created sandbox reports the expected images; chart API preflight passes. |
+| Build and CVE | Resolved dependency locks, final-digest OS/language scans, digest-linked SBOMs, scanner and advisory-database timestamps, complete coverage of application and deployed OpenShell/controller images, and a security-owned disposition for policy-blocking findings are recorded. No artifact is promoted on a missing/stale scan or unresolved applicable KEV, critical, or high finding without a scoped, expiring exception. |
 | Sandbox host compatibility | The selected node image and runtime pass OpenShell's active Landlock, seccomp, task-memory, and socket probes; unsupported pools are excluded from scheduling. On OpenShift, use 4.19+ and verify restricted SCC/runtime behavior; on GKE, separately qualify the chosen Standard node pool and upstream Agent Sandbox controller. [OpenShell support matrix](https://docs.nvidia.com/openshell/v0.1.5/about/support-matrix), [OpenShift guide](https://docs.nvidia.com/openshell/v0.1.5/kubernetes/openshift). |
 | Kubernetes boundary | Independent ingress/egress CNI canary passes in every workspace namespace; generated NetworkPolicy selectors match workload Pods; unauthorized direct worker egress fails. [Kubernetes setup](https://docs.nvidia.com/openshell/v0.1.5/kubernetes/setup). |
 | Tenant isolation | Two tenants have separate workspaces and intended namespaces; user, controller, broker, result, PVC, provider, and audit access cannot cross tenant boundaries. [Kubernetes workspaces](https://docs.nvidia.com/openshell/v0.1.5/kubernetes/workspaces). |
+| Research visibility | Within one tenant, only the submitter and current members of the job's exact approved Okta group can list/status/stream the job; unrelated users and ungranted administrators cannot. Exercise per-job group-audience revocation, Okta member removal, application reader-grant revocation, stale sessions, SSE replay, guessed job/evidence IDs, and group reader cancellation denial. A private report fails closed when any required source entitlement is unavailable. See [research visibility](research-visibility.md). |
 | Okta and gateway | Dashboard PKCE/session works; controller client-credentials token has exact gateway audience, roles, scopes, and stable subject; unauthorized token fails. Direct operator CLI PKCE is enabled only after its Okta callback test passes. [Gateway auth](https://docs.nvidia.com/openshell/v0.1.5/how-it-works/gateways/authentication). |
 | Vault and secrets | Gateway SA can read/write only its OpenShell provider-secret path; broker identity only its source-grant path; broker rejects revoked/expired source grants on every call; no reusable source token appears in worker files, logs, traces, or reports. [Credential drivers](https://docs.nvidia.com/openshell/v0.1.5/how-it-works/gateways/configuration). |
 | Policy and provider | Linted pinned profiles; attachment receipt applied; newest effective policy revision `Loaded`; approved endpoint succeeds, disallowed endpoint/tool fails, and provider attachment does not widen the job boundary. [Policy verification](https://docs.nvidia.com/openshell/v0.1.5/how-it-works/policies/manage-policies). |

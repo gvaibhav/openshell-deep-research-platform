@@ -2,7 +2,7 @@
 
 **Status:** proposed design, 2026-10-23  
 **Target baseline:** NVIDIA OpenShell v0.1.5, Python Deep Agents worker  
-**Related documents:** [requirements](requirements.md), [feasibility and market assessment](feasibility-and-market-assessment.md), [ChatGPT Enterprise integration option](design/chatgpt-enterprise-integration.md), [Replit rollout fit](design/replit-rollout-fit.md), [identity and access](design/identity-and-access.md), [Okta implementation handoff](okta/requirements-and-design.md), [job lifecycle](design/job-lifecycle.md), [research and evidence](design/research-and-evidence.md), [MCP connector broker](design/mcp-connector-broker.md), [deployment topology](design/deployment-topology.md), [deployment and operations](design/deployment-and-operations.md).
+**Related documents:** [requirements](requirements.md), [feasibility and market assessment](feasibility-and-market-assessment.md), [ChatGPT Enterprise integration option](design/chatgpt-enterprise-integration.md), [Replit rollout fit](design/replit-rollout-fit.md), [identity and access](design/identity-and-access.md), [research visibility](design/research-visibility.md), [Okta implementation handoff](okta/requirements-and-design.md), [job lifecycle](design/job-lifecycle.md), [research and evidence](design/research-and-evidence.md), [MCP connector broker](design/mcp-connector-broker.md), [deployment topology](design/deployment-topology.md), [deployment and operations](design/deployment-and-operations.md).
 
 This document specifies the **candidate custom system**: a dashboard outside OpenShell and a research process inside OpenShell. The organization already provides ChatGPT Enterprise to all employees and plans a Replit rollout, so the [platform selection gate](requirements.md) tests those research paths before a full dashboard build. The four candidate controls remain a server-held job policy, credential broker, separate public/private lanes, and durable evidence. This document separates interactive user authentication, controller authentication, sandbox workload identity, and the credentials used to call research sources. Statements about current product capabilities are cited.
 
@@ -15,6 +15,7 @@ This document specifies the **candidate custom system**: a dashboard outside Ope
 | Direct sandbox access | Optional for authorized operators in the initial design; gated on an Okta/OpenShell CLI login test | OpenShell documents OIDC browser login with PKCE for its CLI, while workspace membership controls access. Its current ephemeral localhost callback may conflict with Okta redirect registration; a device grant needs a separate test. The application will not expose an unauthenticated sandbox web service. |
 | Research execution | One short-lived OpenShell sandbox per job or per independently authorized research lane | The Deep Agents graph, tool selection, scratch work, and synthesis execute in the sandbox. |
 | Control plane | Dashboard/API, job controller, policy admission, durable queue, results store, and credential broker outside sandboxes | These services hold tenant identity, source grants, and authorization policy. |
+| Research visibility | The submitter and, if selected at admission, current members of one approved same-tenant Okta group may see a job; later named readers need an explicit expiring grant | The application binds each job to its exact audience and applies source-derived checks before private content is served. Okta login or OpenShell workspace membership alone does not grant result access. |
 | Source access | Read-only, typed MCP tools through a task-aware connector broker by default | The broker checks tool arguments and task resource bounds that OpenShell MCP policy cannot inspect. |
 | Model access | An enterprise-approved model endpoint through an OpenShell inference/provider binding | Model requests may contain source material; the endpoint must be approved for the job's data class. |
 | Job state | Durable outside the worker | Sandbox deletion and worker failure cannot be the only record of a job. |
@@ -77,7 +78,7 @@ flowchart TB
         JP["Job policy and controller"]
         TB["Token and connector broker"]
         VA["Encrypted source grant vault"]
-        DB["Job and artifact stores"]
+        DB["Job, visibility policy, and artifact stores"]
     end
     subgraph Z3["OpenShell boundary"]
         GW["Gateway, policy and provider state"]
@@ -367,6 +368,8 @@ erDiagram
     JOB ||--o{ EVIDENCE : produces
     JOB ||--o| REPORT : completes_with
     JOB ||--o{ JOB_SOURCE_GRANT : permits
+    JOB ||--|| JOB_ACCESS_POLICY : controls_visibility
+    JOB_ACCESS_POLICY ||--o{ JOB_READER_GRANT : allows
     SOURCE_CONNECTION ||--o{ JOB_SOURCE_GRANT : selected_for
     EVIDENCE ||--o{ CITATION : supports
     REPORT ||--o{ CITATION : contains
@@ -415,6 +418,18 @@ erDiagram
       string resource_selector
       string allowed_tools
     }
+    JOB_ACCESS_POLICY {
+      string job_id PK
+      string base_mode
+      string okta_group_id
+      int version
+      datetime updated_at
+    }
+    JOB_READER_GRANT {
+      string id PK
+      string subject_id
+      datetime expires_at
+    }
     EVIDENCE {
       string id PK
       string job_id
@@ -427,7 +442,7 @@ erDiagram
       string id PK
       string job_id
       string artifact_reference
-      string visibility
+      string classification
     }
     CITATION {
       string id PK
@@ -437,7 +452,7 @@ erDiagram
     }
 ```
 
-The actual database schema may differ. This model states ownership and authorization invariants: every job and source connection belongs to one tenant; every evidence object belongs to one job; every report citation resolves to retained evidence; source grants are referenced by secure vault IDs, never copied into a job row.
+The actual database schema may differ. This model states ownership and authorization invariants: every job and source connection belongs to one tenant; every evidence object belongs to one job; every report citation resolves to retained evidence; source grants are referenced by secure vault IDs, never copied into a job row. The versioned job access policy is separate from the immutable execution policy. Its `base_visibility` is chosen at admission as submitter-only or an exact approved Okta group; the submitter retains individual access in either mode. An owner or authorized steward can later narrow group visibility to submitter-only through an audited, atomic revocation; v1 cannot widen or switch groups after admission. Later `reader_subjects` grants are explicit and expiring. Authorization joins the job's tenant and owner to the current access policy before returning even a job-list row; report and evidence reads also check source-derived rights. See [research visibility](design/research-visibility.md).
 
 ## 10. Deployment topology
 
@@ -527,14 +542,14 @@ A failed OAuth exchange, denied MCP tool, revoked source connection, failed poli
 | Boundary or risk | Required control and verification |
 |---|---|
 | Direct user access to OpenShell | Prove the CLI's PKCE localhost redirect works with Okta, or separately approve and prove device grant; then require the OpenShell gateway audience, user role, and intended workspace membership. Direct CLI access is separately granted. |
-| Cross-tenant job access | Every job API and broker request resolves a verified subject or sandbox identity to one tenant/job before reading state or data. |
+| Cross-user and cross-tenant job access | Every dashboard job list, status, event, report, evidence, and artifact request resolves a verified subject and selected tenant to the submitter, current member of the exact selected Okta group, or an active named reader grant. Same-tenant and admin roles grant no implicit read. The broker separately resolves sandbox identity to one job. |
 | Overbroad provider attachment | Controller inspects full effective OpenShell policy after provider attachment; denies any unexpected endpoint, method, or tool. |
 | MCP tool arguments | Broker validates repo/channel/project/log-view selectors, time windows, and result sizes. OpenShell tool-name filtering remains a second enforcement layer. |
 | OAuth and MCP compatibility | Test each vendor's protected-resource metadata, client registration method, token audience/resource parameter, token refresh, protocol revision, and 401 recovery. LangChain's current MCPAdapter is beta. [LangChain MCP](https://docs.langchain.com/oss/python/langchain/mcp). |
 | Prompt injection | Source content is untrusted; read-only tool catalogs, source-specific retrieval subagents, and immutable job policy prevent source text from granting capabilities. |
 | Model and tracing egress | Explicit allowlist by data classification; retain prompt/tracing metadata only under the selected enterprise policy. |
 | Long-running jobs | Durable queue/checkpoints, per-job deadlines and budgets, idempotent cancellation, reconciliation after controller restart. |
-| Result confidentiality | Per-tenant authorization at report/evidence read time, encrypted storage, retention and deletion policy, no token-bearing source URLs. |
+| Result confidentiality | Full-report and evidence authorization at read time includes job visibility, classification, retention, and current source rights. The API denies the whole report if any approved private job source/resource is unauthorized, including uncited inputs, uses no browser-accessible object-store URLs, and closes event streams on revocation. |
 | Kubernetes network bypass | Test denied egress at pod level under the actual CNI before handling private sources. |
 
 ## 13. Integration gates and open decisions
@@ -544,8 +559,9 @@ The design can start with a public-only job before enterprise connectors exist. 
 1. **Submitter or app identity per source?** Default Slack to user identity, GitHub to user identity unless the task explicitly uses an approved repository installation, and Cloud Logging to a dedicated least-privilege workload identity.
 2. **Direct hosted MCP or broker wrapper per source?** Use direct only when upstream RBAC already enforces the entire task scope and the OAuth/MCP handshake works headlessly. Otherwise use the broker's typed tool.
 3. **Which data may reach which model and trace service?** This is a per-tenant classification policy, not an agent preference.
-4. **What constitutes an authorized result viewer?** Define whether only the submitter, a team, or a tenant can see evidence from user-delegated grants.
-5. **How are approvals represented if write tools are later enabled?** A future design must distinguish preview, human approval, and execution tokens.
-6. **Can Okta complete the current OpenShell CLI callback flow?** Test browser PKCE before enabling that login path. If it fails, test a separately approved device grant before granting direct operator access.
+4. **How are approvals represented if write tools are later enabled?** A future design must distinguish preview, human approval, and execution tokens.
+5. **Can Okta complete the current OpenShell CLI callback flow?** Test browser PKCE before enabling that login path. If it fails, test a separately approved device grant before granting direct operator access.
+
+The result-viewer rule is settled for this candidate design: jobs start with the submitter plus an optional approved Okta group selected at admission; that group audience can be revoked for the job, and later named reader grants are a separate feature. Every group or named reader must also pass classification and source-derived checks before seeing a report or evidence. The [research visibility design](design/research-visibility.md) specifies list, event, share, and revocation behavior.
 
 The initial scaffold should preserve these contracts without pretending that a selected framework provides them automatically. The [identity design](design/identity-and-access.md), [job lifecycle](design/job-lifecycle.md), [broker design](design/mcp-connector-broker.md), and [research/evidence design](design/research-and-evidence.md) specify their implementations.

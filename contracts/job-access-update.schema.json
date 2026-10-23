@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openshell-deep-research.invalid/v1/job-access-update.schema.json",
+  "title": "Replace explicit job reader grants",
+  "description": "Untrusted browser input for a conditional P1 update. The API derives job, owner, tenant, and current base visibility from server-held state; verifies manage permission, current same-tenant eligibility, allowed actions, and bounded future expiry for each proposed reader; and uses If-Match to prevent lost updates. An empty list revokes all explicit grants. The API rejects duplicate subjects and logs additions, changes, and revocations to append-only audit.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["reader_subjects"],
+  "properties": {
+    "reader_subjects": {
+      "type": "array",
+      "maxItems": 100,
+      "uniqueItems": true,
+      "items": {"$ref": "reader-grant-request.schema.json"},
+      "description": "Desired individual grants. Each subject must be unique; the API checks this across objects, enforces a tenant maximum lifetime, and computes server-side grant audit fields."
+    }
+  }
+}

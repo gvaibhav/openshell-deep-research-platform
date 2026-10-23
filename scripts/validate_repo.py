@@ -23,10 +23,16 @@ EXAMPLES = ROOT / "examples"
 EXAMPLE_SCHEMAS = {
     "job-request.json": "job-request.schema.json",
     "job-policy.json": "job-policy.schema.json",
+    "job-access.json": "job-access.schema.json",
+    "job-access-shared.json": "job-access.schema.json",
+    "job-access-group-revoked.json": "job-access.schema.json",
+    "job-access-update.json": "job-access-update.schema.json",
+    "job-group-revocation.json": "job-group-revocation.schema.json",
     "stage-public.json": "stage-manifest.schema.json",
     "stage-enterprise.json": "stage-manifest.schema.json",
     "job-event.json": "job-event.schema.json",
     "evidence.json": "evidence.schema.json",
+    "evidence-view.json": "evidence-view.schema.json",
     "public-evidence.json": "evidence.schema.json",
     "report.json": "report.schema.json",
 }
@@ -91,8 +97,14 @@ def check_contracts(errors: list[str]) -> tuple[int, int]:
     if len(examples) == len(EXAMPLE_SCHEMAS):
         request = examples["job-request.json"]
         policy = examples["job-policy.json"]
+        access = examples["job-access.json"]
+        shared_access = examples["job-access-shared.json"]
+        revoked_group_access = examples["job-access-group-revoked.json"]
+        access_update = examples["job-access-update.json"]
+        group_revocation = examples["job-group-revocation.json"]
         event = examples["job-event.json"]
         evidence = examples["evidence.json"]
+        evidence_view = examples["evidence-view.json"]
         public_evidence = examples["public-evidence.json"]
         report = examples["report.json"]
         public_stage = examples["stage-public.json"]
@@ -105,6 +117,42 @@ def check_contracts(errors: list[str]) -> tuple[int, int]:
             errors.append("Example job IDs do not match")
         if request["mode"] != policy["mode"]:
             errors.append("Example request and policy modes do not match")
+        if request["visibility_selection"] != access["base_visibility"]:
+            errors.append("Initial access policy does not bind the requested visibility")
+        for label, acl in (
+            ("initial", access),
+            ("shared", shared_access),
+            ("group-revoked", revoked_group_access),
+        ):
+            if (acl["job_id"], acl["tenant_id"], acl["owner_subject"]) != (
+                policy["job_id"], policy["tenant_id"], policy["user_subject"]
+            ):
+                errors.append(f"{label} access policy is not bound to the job and tenant")
+            subjects = [grant["subject"] for grant in acl["reader_subjects"]]
+            if len(subjects) != len(set(subjects)):
+                errors.append(f"{label} access policy repeats a reader subject")
+            for grant in acl["reader_subjects"]:
+                if instant(grant["granted_at"]) >= instant(grant["expires_at"]):
+                    errors.append(f"{label} reader grant is expired at issue")
+        if access["version"] != 1 or access["reader_subjects"] or access["created_at"] != access["updated_at"]:
+            errors.append("Initial access policy is not an empty-reader version 1")
+        if shared_access["base_visibility"] != access["base_visibility"] or shared_access["version"] != access["version"] + 1:
+            errors.append("Reader update changed base visibility or skipped a version")
+        if revoked_group_access["base_visibility"] != {"mode": "submitter"} or revoked_group_access["version"] != access["version"] + 1 or revoked_group_access["reader_subjects"] != access["reader_subjects"]:
+            errors.append("Group revocation does not only narrow the base audience")
+        if not group_revocation["reason"].strip():
+            errors.append("Group revocation has no meaningful audit reason")
+        if [
+            {key: grant[key] for key in ("subject", "actions", "expires_at")}
+            for grant in shared_access["reader_subjects"]
+        ] != access_update["reader_subjects"]:
+            errors.append("Reader update does not match the shared access policy")
+        if any(grant["granted_by_subject"] != policy["user_subject"] for grant in shared_access["reader_subjects"]):
+            errors.append("Example reader grantor is not the submitter")
+        if any(evidence_view[key] != evidence.get(key) for key in evidence_view):
+            errors.append("Evidence view changes retained evidence values")
+        if {"artifact_ref", "access_context_ref", "tool_call_id"} & evidence_view.keys():
+            errors.append("Evidence view includes an internal reference")
         if request["sources"] != policy["approved_sources"]:
             errors.append("Example approved sources differ from the request")
         if request["question"] != report["question"]:
@@ -183,6 +231,18 @@ def check_contracts(errors: list[str]) -> tuple[int, int]:
         unauthorized_request = deepcopy(request)
         unauthorized_request["tenant_id"] = "another-tenant"
         guard_cases.append(("job-request.schema.json", unauthorized_request, "browser-supplied tenant"))
+        unauthorized_owner = deepcopy(request)
+        unauthorized_owner["owner_subject"] = "forged-owner"
+        guard_cases.append(("job-request.schema.json", unauthorized_owner, "browser-supplied owner"))
+        unauthorized_acl = deepcopy(request)
+        unauthorized_acl["reader_subjects"] = []
+        guard_cases.append(("job-request.schema.json", unauthorized_acl, "browser-supplied reader ACL"))
+        missing_group_id = deepcopy(request)
+        missing_group_id["visibility_selection"] = {"mode": "okta_group"}
+        guard_cases.append(("job-request.schema.json", missing_group_id, "group choice without stable group ID"))
+        group_with_owner = deepcopy(request)
+        group_with_owner["visibility_selection"]["owner_subject"] = "forged-owner"
+        guard_cases.append(("job-request.schema.json", group_with_owner, "group choice with forged owner"))
         no_public_brief = deepcopy(request)
         del no_public_brief["public_research_brief"]
         guard_cases.append(("job-request.schema.json", no_public_brief, "combined request without public brief"))
@@ -204,6 +264,30 @@ def check_contracts(errors: list[str]) -> tuple[int, int]:
         evidence_without_call = deepcopy(evidence)
         del evidence_without_call["tool_call_id"]
         guard_cases.append(("evidence.schema.json", evidence_without_call, "evidence without tool call ID"))
+        evidence_view_with_artifact = deepcopy(evidence_view)
+        evidence_view_with_artifact["artifact_ref"] = evidence["artifact_ref"]
+        guard_cases.append(("evidence-view.schema.json", evidence_view_with_artifact, "browser evidence with artifact reference"))
+        evidence_view_with_context = deepcopy(evidence_view)
+        evidence_view_with_context["access_context_ref"] = evidence["access_context_ref"]
+        guard_cases.append(("evidence-view.schema.json", evidence_view_with_context, "browser evidence with access context"))
+        arbitrary_event_message = deepcopy(event)
+        arbitrary_event_message["message"] = "A private repository change exposed a secret."
+        guard_cases.append(("job-event.schema.json", arbitrary_event_message, "worker-generated event prose"))
+        update_with_base = deepcopy(access_update)
+        update_with_base["base_visibility"] = {"mode": "okta_group", "okta_group_id": "another-group"}
+        guard_cases.append(("job-access-update.schema.json", update_with_base, "reader update changing base visibility"))
+        update_with_tenant = deepcopy(access_update)
+        update_with_tenant["tenant_id"] = "another-tenant"
+        guard_cases.append(("job-access-update.schema.json", update_with_tenant, "reader update changing tenant"))
+        update_with_audit_field = deepcopy(access_update)
+        update_with_audit_field["reader_subjects"][0]["grant_id"] = "77777777-7777-4777-8777-777777777777"
+        guard_cases.append(("job-access-update.schema.json", update_with_audit_field, "browser-assigned grant ID"))
+        update_without_expiry = deepcopy(access_update)
+        del update_without_expiry["reader_subjects"][0]["expires_at"]
+        guard_cases.append(("job-access-update.schema.json", update_without_expiry, "reader grant without expiry"))
+        revoke_without_reason = deepcopy(group_revocation)
+        del revoke_without_reason["reason"]
+        guard_cases.append(("job-group-revocation.schema.json", revoke_without_reason, "group revocation without reason"))
         for schema_name, payload, label in guard_cases:
             validator = Draft202012Validator(
                 read_json(CONTRACTS / schema_name),
@@ -218,7 +302,8 @@ def check_contracts(errors: list[str]) -> tuple[int, int]:
 
 def check_markdown(errors: list[str]) -> tuple[int, int]:
     diagrams = 0
-    paths = [ROOT / "README.md", *sorted((ROOT / "docs").rglob("*.md"))]
+    paths = [ROOT / "README.md", ROOT / "AGENTS.md", *sorted((ROOT / "docs").rglob("*.md"))]
+    paths.extend(sorted((ROOT / ".agents" / "skills").rglob("SKILL.md")))
     paths.extend(sorted((ROOT / "apps").rglob("*.md")))
     paths.extend(sorted((ROOT / "services").rglob("*.md")))
     paths.extend(sorted((ROOT / "infra").rglob("*.md")))

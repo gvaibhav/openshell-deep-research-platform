@@ -5,7 +5,7 @@
   "at": "2026-10-23T12:21:00Z",
   "type": "evidence",
   "status": "running",
-  "message": "Captured a repository change that may explain the latency increase.",
+  "message": "Evidence captured.",
   "evidence_id": "33333333-3333-4333-8333-333333333333",
   "progress_percent": 42
 }

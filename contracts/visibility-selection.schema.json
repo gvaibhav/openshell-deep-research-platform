@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openshell-deep-research.invalid/v1/visibility-selection.schema.json",
+  "title": "Job visibility selection",
+  "description": "Shape only. A browser selection is untrusted: the API binds an approved stable Okta group ID only after validating the submitter's current membership, tenant mapping, and group publishing policy. It never authorizes access by itself.",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode"],
+      "properties": {
+        "mode": {"const": "submitter"}
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "okta_group_id"],
+      "properties": {
+        "mode": {"const": "okta_group"},
+        "okta_group_id": {"type": "string", "minLength": 1, "maxLength": 200}
+      }
+    }
+  ]
+}

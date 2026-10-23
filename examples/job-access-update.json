@@ -1,0 +1,9 @@
+{
+  "reader_subjects": [
+    {
+      "subject": "00u-example-reader",
+      "actions": ["list_job", "read_status", "read_events", "read_report", "read_evidence"],
+      "expires_at": "2026-10-30T12:30:00Z"
+    }
+  ]
+}

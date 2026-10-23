@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openshell-deep-research.invalid/v1/job-access.schema.json",
+  "title": "Server-held job access policy",
+  "description": "Versioned server-held ACL stored separately from the immutable job execution policy. Job, tenant, owner, and initial base visibility are bound at creation. The only v1 base-visibility change is audited, conditional narrowing from okta_group to submitter through the dedicated revoke-group operation; a group cannot be switched or restored. Reader-grant updates cannot change base visibility. Current Okta group membership and tenant eligibility are rechecked at read time. Reader subjects never gain manage rights.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["job_id", "tenant_id", "owner_subject", "base_visibility", "version", "reader_subjects", "created_at", "updated_at"],
+  "properties": {
+    "job_id": {"type": "string", "format": "uuid"},
+    "tenant_id": {"type": "string", "minLength": 1, "maxLength": 200},
+    "owner_subject": {"type": "string", "minLength": 1, "maxLength": 500},
+    "base_visibility": {"$ref": "visibility-selection.schema.json"},
+    "version": {"type": "integer", "minimum": 1},
+    "reader_subjects": {
+      "type": "array",
+      "maxItems": 100,
+      "uniqueItems": true,
+      "items": {"$ref": "reader-grant.schema.json"},
+      "description": "Explicit named individual grants; only unexpired, unrevoked entries with the requested action authorize. The API verifies each subject belongs to the job tenant. Empty at version 1. Removal writes a separate append-only audit record; no grant confers cancel or ACL-management rights. Subjects must be unique, enforced by the API."
+    },
+    "created_at": {"type": "string", "format": "date-time"},
+    "updated_at": {"type": "string", "format": "date-time"}
+  }
+}

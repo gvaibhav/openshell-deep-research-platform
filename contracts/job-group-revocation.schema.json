@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openshell-deep-research.invalid/v1/job-group-revocation.schema.json",
+  "title": "Revoke job group visibility",
+  "description": "P0 request to narrow an admission-bound group audience to submitter-only. The API checks owner or job-specific steward, CSRF, and a strong If-Match; records an append-only audit event; and never copies the untrusted reason into status, SSE, or API errors.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["reason"],
+  "properties": {
+    "reason": {
+      "type": "string",
+      "minLength": 10,
+      "maxLength": 500,
+      "description": "Required explanation for privileged group revocation. Escape for audit storage/display; restrict audit access."
+    }
+  }
+}

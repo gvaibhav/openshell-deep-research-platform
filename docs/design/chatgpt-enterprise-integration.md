@@ -131,17 +131,17 @@ sequenceDiagram
     API->>OS: Start approved sandbox job via controller
     User->>CG: Check progress
     CG->>MCP: job_status with per-user OAuth token
-    MCP->>API: Recheck job ownership and visibility
+    MCP->>API: Recheck job visibility for this user and action
     API-->>MCP: Bounded status
     MCP-->>CG: Bounded status
     User->>CG: Get report
     CG->>MCP: get_report with per-user OAuth token
-    MCP->>API: Recheck ownership, source policy and classification
+    MCP->>API: Recheck job ACL, source policy and classification
     API-->>MCP: Permitted report and evidence references
     MCP-->>CG: Permitted report and evidence references
 ```
 
-`submit_job` creates durable state and must declare `readOnlyHint: false`; `job_status` and `get_report` can use `readOnlyHint: true` only if they make no state changes. Every tool also needs explicit `destructiveHint` and `openWorldHint` boolean annotations with values matching its actual effects and destination scope. These hints do not replace authorization. Configure workspace action permissions and test confirmation behavior, duplicate submissions, job ownership, revocation, timeouts, and follow-up tool selection. The plugin must never forward the ChatGPT bearer token to the OpenShell gateway or place source refresh tokens in a sandbox. [Tool annotation rules](https://developers.openai.com/plugins/plugin-guidelines), [workspace action controls](https://learn.chatgpt.com/docs/enterprise/apps-and-connectors).
+`submit_job` creates durable state and must declare `readOnlyHint: false`; `job_status` and `get_report` can use `readOnlyHint: true` only if they make no state changes. Every tool also needs explicit `destructiveHint` and `openWorldHint` boolean annotations with values matching its actual effects and destination scope. These hints do not replace authorization. Configure workspace action permissions and test confirmation behavior, duplicate submissions, the same per-job owner/group/reader access policy used by the dashboard, revocation, timeouts, and follow-up tool selection. The plugin must never forward the ChatGPT bearer token to the OpenShell gateway or place source refresh tokens in a sandbox. [Tool annotation rules](https://developers.openai.com/plugins/plugin-guidelines), [workspace action controls](https://learn.chatgpt.com/docs/enterprise/apps-and-connectors).
 
 If report contents are not approved for the ChatGPT boundary, `get_report` must return only permitted metadata and an access-controlled project link. That result may still require a thin project report viewer. An optional plugin UI can be evaluated, but neither it nor a full dashboard is assumed necessary until the user workflow is tested. [Plugin connection testing](https://developers.openai.com/plugins/deploy/connect-chatgpt).
 

@@ -5,8 +5,16 @@ info:
   description: >-
     Proposed browser-facing job API. The BFF authenticates users with Okta
     Authorization Code plus PKCE and uses a secure HttpOnly session cookie.
-    All requests recheck tenant and job authorization; mutation endpoints also
-    require CSRF protection. This file does not define internal worker or broker APIs.
+    Job creation binds a server-held, versioned access policy from a validated
+    visibility_selection: the individual submitter or one approved Okta group.
+    Every job read requires current tenant eligibility and either the owner
+    subject, current membership in that exact selected group, or an active
+    explicit, unexpired reader-subject grant for the requested read action.
+    Group and reader access never imply manage
+    permission. Public source classification never makes a job public. Resource
+    identifiers and pagination cursors are locators, not capabilities. All
+    requests recheck authorization; mutation endpoints also require CSRF
+    protection. This file does not define internal worker or broker APIs.
 servers:
   - url: https://research.example.invalid
 security:
@@ -19,6 +27,13 @@ paths:
       description: >-
         Validate user/session, selected source connections, public brief when
         applicable, policy, quotas, and idempotency before accepting a job.
+        Treat visibility_selection as an untrusted choice, not an ACL: for
+        okta_group, validate the stable group ID against the tenant allowlist,
+        the submitter's current Okta membership, and group publishing policy.
+        Atomically bind owner_subject and tenant_id from the authenticated
+        session and create a separate access policy at version 1 with empty
+        reader_subjects. A submitter retains individual read access in group
+        mode. Reject browser-supplied owner, tenant, grants, or arbitrary ACL.
       parameters:
         - $ref: '#/components/parameters/CsrfHeader'
         - $ref: '#/components/parameters/IdempotencyKey'
@@ -48,13 +63,29 @@ paths:
     get:
       operationId: listJobs
       summary: List jobs visible to the signed-in user
+      description: >-
+        Filter by current tenant and the effective visibility predicate before
+        pagination. The predicate is owner_subject equals current subject, or
+        current membership in the exact bound Okta group, or an active explicit
+        reader_subject grant containing list_job; all branches require current
+        tenant eligibility.
+        A group name, old membership claim, tenant membership alone, or a public
+        evidence label never grants job visibility. Omit unauthorized rows and
+        their counts. The opaque, expiring cursor is bound to the subject,
+        tenant, query, and visibility epoch, grants no authority, and each page
+        rechecks current group membership and ACL state. ACL changes invalidate
+        relevant cursors. If an authorization dependency is
+        unavailable, fail closed. report_available is computed for this viewer
+        and may be omitted when the full job-policy source check has not run.
       parameters:
         - in: query
           name: cursor
+          description: Opaque server cursor; it does not grant access.
           schema:
             type: string
         - in: query
           name: limit
+          description: Maximum authorized rows to return after access filtering.
           schema:
             type: integer
             minimum: 1
@@ -63,6 +94,9 @@ paths:
       responses:
         '200':
           description: Authorized page of job summaries
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
           content:
             application/json:
               schema:
@@ -84,9 +118,19 @@ paths:
     get:
       operationId: getJob
       summary: Get the authoritative job snapshot
+      description: >-
+        Recheck current tenant and job visibility for read_status before
+        returning any status fields. If the ACL or current group eligibility
+        cannot be verified,
+        fail closed with the same 404 as an inaccessible job. report_available,
+        if present, is computed for this viewer after all approved private
+        job-policy source and resource checks, including uncited inputs.
       responses:
         '200':
           description: Current job state
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
           content:
             application/json:
               schema:
@@ -104,8 +148,16 @@ paths:
       description: >-
         Server-sent events. Each data field is JSON matching
         job-event.schema.json; the SSE id is the monotonically increasing
-        sequence. The client can reconnect using Last-Event-ID, then fetch
-        GET /v1/jobs/{job_id} to reconcile gaps.
+        sequence. Authorize read_events at connect and before replayed and live
+        event delivery; close the stream promptly on revocation or unavailable
+        ACL/group checks. Last-Event-ID is scoped to this job and never grants
+        access or permits replay from another job. The API maps worker output
+        to trusted, neutral message templates. Suppress an evidence event for a
+        viewer without both read_evidence and current exact-source access;
+        evidence_id must never appear without that check. Never stream raw
+        source content, user prompts, worker prose, or credentials. The client
+        can reconnect using
+        Last-Event-ID, then fetch GET /v1/jobs/{job_id} to reconcile gaps.
       parameters:
         - in: header
           name: Last-Event-ID
@@ -115,6 +167,9 @@ paths:
       responses:
         '200':
           description: Server-sent event stream
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
           content:
             text/event-stream:
               schema:
@@ -133,6 +188,10 @@ paths:
       description: >-
         Fences the active attempt and revokes broker authority. Repeating the
         request returns the same terminal or cancellation-in-progress state.
+        Only the owner or an explicitly authorized job-specific admin may
+        cancel. Membership in the selected group or an explicit reader grant
+        confers read only. Return the same 404 for a job with no manage right
+        as for an unknown job.
       parameters:
         - $ref: '#/components/parameters/CsrfHeader'
       responses:
@@ -155,11 +214,23 @@ paths:
       operationId: getReport
       summary: Get an authorized, evidence-backed report
       description: >-
-        Recheck report visibility and source-derived access at read time.
-        A completed job may still deny some evidence to a later viewer.
+        Recheck current tenant and read_report visibility, report retention,
+        the classification of the question, attachments, and report, and current source-derived
+        access to every approved private source and resource in the immutable
+        job policy, including uncited inputs, before returning any report
+        fields. Treat an unavailable entitlement source as denied. Version 1
+        serves the complete report or nothing: if any policy source/resource
+        cannot be authorized, return the same 404 as an inaccessible report,
+        with no partial text, question, title, citations, or source metadata.
+        A completed job can therefore have report_available false for this
+        viewer. Return 409 only when an otherwise authorized report is not yet
+        complete.
       responses:
         '200':
           description: Final report
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
           content:
             application/json:
               schema:
@@ -178,20 +249,208 @@ paths:
       operationId: getEvidence
       summary: Get authorized evidence metadata and bounded excerpt
       description: >-
-        Recheck tenant, job, and source-derived visibility. An artifact_ref is
-        an opaque internal identifier, not a public or signed download URL.
+        Resolve evidence_id only within this job, then recheck current tenant
+        eligibility, read_evidence visibility, evidence retention and
+        classification, and source-derived
+        authorization before revealing metadata or an excerpt. If any check or
+        dependency is unavailable, return the same 404 as unknown evidence.
+        Return an authorized, sanitized view only. Internal artifact_ref and
+        access_context_ref are never serialized to the browser. A public
+        evidence classification does not bypass job visibility.
       responses:
         '200':
           description: Evidence metadata
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
           content:
             application/json:
               schema:
-                $ref: ./evidence.schema.json
+                $ref: ./evidence-view.schema.json
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+  /v1/jobs/{job_id}/evidence/{evidence_id}/content:
+    parameters:
+      - $ref: '#/components/parameters/JobId'
+      - $ref: '#/components/parameters/EvidenceId'
+    get:
+      operationId: getEvidenceContent
+      summary: Proxy an authorized retained evidence snapshot
+      description: >-
+        Resolve this evidence within the named job and recheck current tenant,
+        read_evidence visibility, retention, classification, and source-derived access
+        before opening an encrypted server-held artifact. Recheck on bounded
+        checkpoints during long streams and abort promptly on revocation.
+        Return 404 if any authorization input is denied or unavailable. The
+        BFF proxies bounded bytes as an attachment with no-store and nosniff;
+        it never redirects to object storage, signs a direct object URL, or
+        reveals artifact_ref or access_context_ref. The sandbox can be deleted
+        without losing an authorized retained snapshot.
+      responses:
+        '200':
+          description: Authorized bounded evidence content
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+            X-Content-Type-Options:
+              schema:
+                type: string
+                const: nosniff
+            Content-Disposition:
+              description: Safe attachment filename generated by the BFF.
+              schema:
+                type: string
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /v1/jobs/{job_id}/access:
+    parameters:
+      - $ref: '#/components/parameters/JobId'
+    get:
+      operationId: getJobAccess
+      summary: Get the server-held job access policy
+      description: >-
+        Owner or explicitly authorized job-specific admin only. Group members
+        and explicit readers do not see the ACL. Return 404 without revealing
+        whether the job exists if the caller lacks manage permission. The
+        owner is bound at job creation. The initial base group can be narrowed
+        only by the dedicated revoke-group operation, never by reader updates.
+      responses:
+        '200':
+          description: Current server-held access policy
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+            ETag:
+              description: Strong quoted version tag, for example "acl-1".
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: ./job-access.schema.json
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      x-phase: P1
+      operationId: replaceJobReaderGrants
+      summary: Replace explicit same-tenant reader grants
+      description: >-
+        Require manage_visibility entitlement and tenant/source sharing policy
+        for the owner or explicitly authorized job-specific steward. Replace
+        only reader_subjects using the strong ETag from GET; reject stale
+        versions and missing If-Match. Validate every proposed subject's
+        current tenant eligibility, allowed read actions, and future expiry
+        within the tenant maximum. The API assigns grant IDs and grantor/time
+        audit fields, rejects duplicate subjects, and logs each add/change/
+        revoke in append-only audit. An empty list revokes explicit grants.
+        Never change owner, tenant, or base_visibility and never infer manage
+        rights from a reader grant. Increment the ACL version atomically,
+        invalidate cached visibility decisions, and close affected SSE streams.
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ./job-access-update.schema.json
+      responses:
+        '200':
+          description: Updated access policy
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+            ETag:
+              description: New strong quoted access-policy version tag.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: ./job-access.schema.json
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+  /v1/jobs/{job_id}/access/revoke-group:
+    parameters:
+      - $ref: '#/components/parameters/JobId'
+    post:
+      operationId: revokeJobGroupVisibility
+      summary: Narrow group visibility to the individual submitter
+      description: >-
+        P0 emergency revocation by the owner or an explicitly authorized
+        job-specific data steward. Require the current strong ACL ETag and
+        CSRF token and a bounded audit reason. Atomically change base_visibility
+        from the admission-bound okta_group to submitter, increment ACL version,
+        and append an audit record with the escaped reason. Never widen
+        visibility, substitute another group, or restore
+        the original group through this API. If already submitter with a
+        current ETag, return the current ACL idempotently. Invalidate cursors,
+        close affected group-reader SSE streams before returning success, and
+        deny the next protected read that relied on former group membership.
+        A separately active individual reader grant remains effective unless
+        it is revoked too.
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ./job-group-revocation.schema.json
+      responses:
+        '200':
+          description: Narrowed access policy
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+            ETag:
+              description: New strong quoted access-policy version tag.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: ./job-access.schema.json
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
 components:
+  headers:
+    NoStore:
+      description: Protected response must not be stored by browsers or shared caches.
+      schema:
+        type: string
+        const: no-store
   securitySchemes:
     dashboardSession:
       type: apiKey
@@ -203,6 +462,7 @@ components:
       in: path
       name: job_id
       required: true
+      description: Opaque job locator; never an authorization capability.
       schema:
         type: string
         format: uuid
@@ -210,6 +470,7 @@ components:
       in: path
       name: evidence_id
       required: true
+      description: Opaque evidence locator, scoped to job_id; never an authorization capability.
       schema:
         type: string
         format: uuid
@@ -228,6 +489,14 @@ components:
         type: string
         minLength: 16
         maxLength: 128
+    IfMatch:
+      in: header
+      name: If-Match
+      required: true
+      description: Strong quoted ETag returned by GET job access; wildcards are rejected.
+      schema:
+        type: string
+        pattern: '^"acl-[1-9][0-9]*"$'
   schemas:
     JobAccepted:
       type: object
@@ -273,9 +542,25 @@ components:
           minimum: 0
         reason_code:
           type: string
-          maxLength: 120
+          description: Allowlisted server status code only; never source or worker text.
+          enum:
+            - ACCESS_CHECK_UNAVAILABLE
+            - BUDGET_EXCEEDED
+            - CANCELED
+            - EXPIRED
+            - POLICY_DENIED
+            - RESEARCH_FAILED
+            - REVIEW_REQUIRED
+            - SOURCE_ACCESS_REVOKED
+            - SOURCE_UNAVAILABLE
         report_available:
           type: boolean
+          description: >-
+            Viewer-specific result of current job, classification, and every
+            approved private job-policy source/resource check, including
+            uncited inputs.
+            True only when GET report can return the entire report now; false
+            on denial or unavailable source checks. Omit if not evaluated.
     ApiError:
       type: object
       additionalProperties: false
@@ -285,6 +570,7 @@ components:
           type: string
         message:
           type: string
+          description: Generic API-owned text; never worker, source, or credential content.
         correlation_id:
           type: string
   responses:
@@ -301,13 +587,13 @@ components:
           schema:
             $ref: '#/components/schemas/ApiError'
     Forbidden:
-      description: Source or budget policy denied the request
+      description: Visibility selection, source, or budget policy denied the request
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ApiError'
     NotFound:
-      description: No visible resource with this identifier
+      description: Generic, non-enumerating response for unknown or inaccessible resource
       content:
         application/json:
           schema:
@@ -325,6 +611,18 @@ components:
           schema:
             type: integer
             minimum: 0
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    PreconditionFailed:
+      description: The job access policy has changed since the supplied If-Match ETag
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    PreconditionRequired:
+      description: A strong If-Match ETag is required to update reader grants
       content:
         application/json:
           schema:

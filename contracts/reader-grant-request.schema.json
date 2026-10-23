@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openshell-deep-research.invalid/v1/reader-grant-request.schema.json",
+  "title": "Requested individual job reader grant",
+  "description": "P1 untrusted grant selection. The API verifies a same-tenant canonical subject, grantor sharing permission, allowed read actions, source and classification policy, and a future expiry within the tenant maximum. It computes grant_id, granted_at, and granted_by_subject itself.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["subject", "actions", "expires_at"],
+  "properties": {
+    "subject": {"type": "string", "minLength": 1, "maxLength": 500},
+    "actions": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "enum": ["list_job", "read_status", "read_events", "read_report", "read_evidence"]}
+    },
+    "expires_at": {"type": "string", "format": "date-time"}
+  }
+}

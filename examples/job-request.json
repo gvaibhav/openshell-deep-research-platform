@@ -2,6 +2,10 @@
   "question": "What caused the recent research-service latency incident, and how was it resolved? Compare public documentation with the selected repository, incident channel, and application logs.",
   "public_research_brief": "Research public documentation on query latency causes and common mitigation patterns in distributed services.",
   "mode": "combined",
+  "visibility_selection": {
+    "mode": "okta_group",
+    "okta_group_id": "00g-example-research-team"
+  },
   "sources": [
     {
       "connector": "public_web",

@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openshell-deep-research.invalid/v1/evidence-view.schema.json",
+  "title": "Authorized evidence view",
+  "description": "Browser response after job and current source authorization. The API sanitizes locators and returns a bounded excerpt. Internal artifact_ref, access_context_ref, and source credentials are never included.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["evidence_id", "job_id", "connector", "resource_uri", "retrieved_at", "content_sha256", "classification"],
+  "properties": {
+    "evidence_id": {"type": "string", "format": "uuid"},
+    "job_id": {"type": "string", "format": "uuid"},
+    "connector": {
+      "type": "string",
+      "enum": ["public_web", "slack", "github", "gcp_logging", "custom_mcp"]
+    },
+    "resource_uri": {"type": "string", "format": "uri", "maxLength": 2000},
+    "source_locator": {"type": "string", "maxLength": 1000},
+    "title": {"type": "string", "maxLength": 1000},
+    "source_published_at": {"type": "string", "format": "date-time"},
+    "retrieved_at": {"type": "string", "format": "date-time"},
+    "content_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "excerpt": {"type": "string", "maxLength": 4000},
+    "source_span": {"type": "string", "minLength": 1, "maxLength": 300},
+    "classification": {
+      "type": "string",
+      "enum": ["public", "internal", "confidential", "restricted"]
+    },
+    "retention_expires_at": {"type": "string", "format": "date-time"},
+    "upstream_tool": {"type": "string", "maxLength": 120}
+  },
+  "anyOf": [
+    {"required": ["excerpt"]},
+    {"required": ["source_span"]}
+  ]
+}
