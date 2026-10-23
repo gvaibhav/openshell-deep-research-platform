@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://schemas.openshell-deep-research.invalid/v1/visibility-selection.schema.json",
   "title": "Job visibility selection",
-  "description": "Shape only. A browser selection is untrusted: the API binds an approved stable Okta group ID only after validating the submitter's current membership, tenant mapping, and group publishing policy. It never authorizes access by itself.",
+  "description": "Shape only. A browser selection is untrusted: the API binds an approved stable Okta group ID to the verified owner_subject.iss and selected tenant only after validating current membership, tenant mapping, and group publishing policy. V1 group readers must have that same issuer and current exact-group membership. A group ID alone never authorizes access.",
   "oneOf": [
     {
       "type": "object",

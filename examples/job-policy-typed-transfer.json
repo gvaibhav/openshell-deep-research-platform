@@ -1,0 +1,105 @@
+{
+  "job_id": "11111111-1111-4111-8111-111111111111",
+  "policy_version": 2,
+  "tenant_id": "tenant-example",
+  "user_subject": {"iss": "https://okta.example.invalid/oauth2/dashboard", "sub": "00u-example-user"},
+  "created_at": "2026-10-23T12:30:00Z",
+  "expires_at": "2026-10-23T13:00:00Z",
+  "mode": "combined",
+  "public_research_brief": "Research public documentation on query latency causes and common mitigation patterns in distributed services.",
+  "public_brief_approval_ref": "decision-public-brief-example-1",
+  "approved_sources": [
+    {
+      "connector": "public_web",
+      "resource_ids": []
+    },
+    {
+      "connector": "github",
+      "connection_ref": "conn_github_example",
+      "resource_ids": ["example-org/research-service"]
+    },
+    {
+      "connector": "slack",
+      "connection_ref": "conn_slack_example",
+      "resource_ids": ["C0123456789"]
+    },
+    {
+      "connector": "gcp_logging",
+      "connection_ref": "conn_gcp_example",
+      "resource_ids": ["projects/example-prod"]
+    }
+  ],
+  "source_partitions": [
+    {
+      "partition_id": "github_repo",
+      "source": {
+        "connector": "github",
+        "connection_ref": "conn_github_example",
+        "resource_ids": ["example-org/research-service"]
+      },
+      "research_brief": "Investigate the selected research-service repository for changes relevant to the recent latency incident.",
+      "brief_approval_ref": "decision-github-brief-example-1"
+    },
+    {
+      "partition_id": "slack_channel",
+      "source": {
+        "connector": "slack",
+        "connection_ref": "conn_slack_example",
+        "resource_ids": ["C0123456789"]
+      },
+      "research_brief": "Investigate the selected incident channel for the recent research-service latency incident and its resolution.",
+      "brief_approval_ref": "decision-slack-brief-example-1"
+    },
+    {
+      "partition_id": "gcp_logs",
+      "source": {
+        "connector": "gcp_logging",
+        "connection_ref": "conn_gcp_example",
+        "resource_ids": ["projects/example-prod"]
+      },
+      "research_brief": "Investigate selected application logs for the recent research-service latency incident and its resolution.",
+      "brief_approval_ref": "decision-gcp-brief-example-1"
+    }
+  ],
+  "cross_partition_transfer_grants": [
+    {
+      "grant_id": "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+      "source_partition_id": "github_repo",
+      "destination_partition_id": "slack_channel",
+      "allowed_key_types": ["commit_sha"],
+      "destination_tool": "search_slack",
+      "destination_query_template_id": "slack_commit_sha_v1",
+      "max_keys": 1,
+      "max_value_bytes": 40,
+      "max_total_bytes": 40,
+      "max_destination_calls": 1,
+      "approval_ref": "decisions-github-export-and-slack-template-1",
+      "approved_at": "2026-10-23T12:29:59Z",
+      "expires_at": "2026-10-23T13:00:00Z"
+    }
+  ],
+  "model_route": "approved-enterprise-model",
+  "classification": "confidential",
+  "limits": {
+    "wall_time_seconds": 3600,
+    "max_model_requests": 200,
+    "max_model_tokens": 200000,
+    "max_tool_calls": 300,
+    "max_source_bytes": 52428800,
+    "max_output_bytes": 10485760,
+    "max_sources": 100,
+    "max_subagents": 4,
+    "max_estimated_cost_usd": 20.0
+  },
+  "allowed_tools": [
+    "search_public_web",
+    "fetch_public_page",
+    "search_github",
+    "read_github_file",
+    "search_slack",
+    "list_log_entries",
+    "read_evidence",
+    "validate_report",
+    "search_by_correlation_key"
+  ]
+}

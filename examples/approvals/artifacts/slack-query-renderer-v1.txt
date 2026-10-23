@@ -1,0 +1,6 @@
+Synthetic fixture artifact: slack-query-renderer-v1
+Input: one broker-validated lowercase ASCII commit_sha of exactly 40 hex characters.
+Output: search_slack arguments are exactly channel_id=C0123456789,
+query=the literal ASCII prefix "commit:" concatenated with commit_sha, and limit=10.
+Reject additional arguments, a different channel, a different prefix, or an unvalidated key.
+This fixture is not a deployed renderer; production binds the digest of its immutable release artifact.

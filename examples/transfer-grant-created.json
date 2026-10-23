@@ -1,0 +1,22 @@
+{
+  "event_id": "17171717-1717-4171-8171-171717171717",
+  "event_type": "transfer_grant_created",
+  "tenant_sequence": 1,
+  "tenant_id": "tenant-example",
+  "job_id": "11111111-1111-4111-8111-111111111111",
+  "policy_version": 2,
+  "grant_id": "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+  "approval_ref": "decisions-github-export-and-slack-template-1",
+  "approval_idempotency_ref": "approval-transaction-transfer-example-1",
+  "approved_at": "2026-10-23T12:29:59Z",
+  "destination_template_sha256": "da7245279b7c6d373d567941b5e5becceb47db40dd133402b1dc3a98fa86a3fd",
+  "destination_renderer_artifact_version": "slack-query-renderer-v1",
+  "destination_renderer_artifact_sha256": "5ef64b4f71dda2e8ccc9a71afcf51a34caddb7782fdb3a5c9abcbf1724aaacae",
+  "source_extractor_artifact_version": "github-commit-extractor-v1",
+  "source_extractor_artifact_sha256": "778002c8cdad7f58ba197456a082534a16153ae04f1cb7d307d1103e9c719586",
+  "source_verifier_artifact_version": "github-commit-verifier-v1",
+  "source_verifier_artifact_sha256": "c51e6d72a8083db50b1ec37df3687c97168000513fde24f029ad5da40d803403",
+  "grant_scope_sha256": "3346559e4bc1587d142cc51206ae1679a1963366eb41f877b38d5197c16cb229",
+  "approval_decisions_sha256": "fa5f590d8e3e9e885a1a1d4271edaf077ba0f536f05d9d3dd355cd069f4189e7",
+  "recorded_at": "2026-10-23T12:30:00Z"
+}

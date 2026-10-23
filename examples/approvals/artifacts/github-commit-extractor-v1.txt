@@ -1,0 +1,5 @@
+Synthetic fixture artifact: github-commit-extractor-v1
+Accept only the provider-generated sha field of an authenticated GitHub commit-object response
+for the selected repository and immutable commit reference. Require lowercase ASCII 40-hex.
+Never use issue titles, labels, custom fields, prose spans, or model-selected text for automatic issuance.
+This fixture is not a deployed extractor; production binds the digest of its immutable release artifact.

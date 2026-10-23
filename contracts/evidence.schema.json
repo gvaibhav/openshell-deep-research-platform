@@ -2,21 +2,30 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://schemas.openshell-deep-research.invalid/v1/evidence.schema.json",
   "title": "Research evidence record",
-  "description": "Immutable evidence metadata. The full source payload is stored separately under tenant-aware access controls.",
+  "description": "Trusted immutable evidence metadata. The full source payload is stored separately under tenant-aware access controls. Source dependencies and derivation fields are internal authorization provenance, never worker-asserted or returned in the browser evidence view.",
   "type": "object",
   "additionalProperties": false,
   "required": [
-    "evidence_id", "job_id", "tool_call_id", "connector", "resource_uri",
-    "retrieved_at", "content_sha256", "artifact_ref", "classification",
-    "access_context_ref"
+    "evidence_id", "job_id", "producing_attempt_id", "tool_call_id", "connector", "resource_uri",
+    "retrieved_at", "content_sha256", "artifact_ref", "source_classification",
+    "dependency_classification_floor", "classification", "source_dependency_evidence_ids",
+    "authorization_sources", "access_context_ref"
   ],
   "properties": {
     "evidence_id": {"type": "string", "format": "uuid"},
     "job_id": {"type": "string", "format": "uuid"},
+    "producing_attempt_id": {
+      "type": "string", "format": "uuid",
+      "description": "Broker-owned identity of the sandbox attempt that received this source response, joined to the authoritative manifest for stage retrieval mode and taint checks. The worker cannot set or change it."
+    },
     "tool_call_id": {"type": "string", "format": "uuid"},
     "connector": {
       "type": "string",
       "enum": ["public_web", "slack", "github", "gcp_logging", "custom_mcp"]
+    },
+    "source_partition_id": {
+      "type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$",
+      "description": "Trusted private source partition that produced this item; absent for public-web evidence."
     },
     "resource_uri": {"type": "string", "format": "uri", "maxLength": 2000},
     "source_locator": {"type": "string", "maxLength": 1000},
@@ -30,20 +39,109 @@
     },
     "excerpt": {"type": "string", "maxLength": 4000},
     "source_span": {"type": "string", "minLength": 1, "maxLength": 300},
+    "source_classification": {
+      "type": "string",
+      "enum": ["public", "internal", "confidential", "restricted"],
+      "description": "Trusted classification of the directly captured source item before inherited cross-source dependencies."
+    },
+    "dependency_classification_floor": {
+      "type": "string",
+      "enum": ["public", "internal", "confidential", "restricted"],
+      "description": "Trusted maximum classification of all transitive foreign-source dependencies; public when there are none."
+    },
     "classification": {
       "type": "string",
-      "enum": ["public", "internal", "confidential", "restricted"]
+      "enum": ["public", "internal", "confidential", "restricted"],
+      "description": "Effective classification. Trusted capture code sets it at least as high as source_classification, dependency_classification_floor, and any more restrictive stage input floor."
+    },
+    "source_dependency_evidence_ids": {
+      "type": "array", "maxItems": 100, "uniqueItems": true,
+      "items": {"type": "string", "format": "uuid"},
+      "description": "Trusted transitive closure of foreign-partition evidence IDs whose content or correlation key influenced this item. Empty for independent capture. The evidence service retains authorization metadata for these IDs for at least this item's lifetime and denies reads if a dependency cannot be resolved."
+    },
+    "authorization_sources": {
+      "type": "array", "maxItems": 100, "uniqueItems": true,
+      "description": "Trusted exact source/resource authorization closure: the primary private source plus every transitive foreign-source dependency, each taken from immutable policy and captured evidence, not worker input. Empty for public-web evidence. A reader needs current rights to every entry.",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["partition_id", "source"],
+        "properties": {
+          "partition_id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$"},
+          "source": {
+            "allOf": [
+              {"$ref": "source-selection.schema.json"},
+              {"properties": {"connector": {"not": {"const": "public_web"}}}}
+            ]
+          }
+        }
+      }
+    },
+    "correlation_derivation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "transfer_grant_ids", "correlation_key_ids"],
+      "description": "Internal provenance for a direct typed-key result in a correlation-only attempt tainted when inbound key IDs were projected before its source calls. Every parallel result inherits the attempt taint regardless of completion order. The broker computes this from its key registry and monotonic attempt state, not worker input.",
+      "properties": {
+        "kind": {"const": "direct_correlation_result"},
+        "transfer_grant_ids": {
+          "type": "array", "minItems": 1, "maxItems": 40, "uniqueItems": true,
+          "items": {"type": "string", "format": "uuid"}
+        },
+        "correlation_key_ids": {
+          "type": "array", "minItems": 1, "maxItems": 40, "uniqueItems": true,
+          "items": {"type": "string", "format": "uuid"}
+        }
+      }
     },
     "access_context_ref": {
       "type": "string", "minLength": 1, "maxLength": 300,
-      "description": "Opaque server-side authorization context identifier; never a bearer token."
+      "description": "Opaque server-side reference to the verified authorization closure and entitlement-check adapter; never a bearer token or an alternative to checking authorization_sources and current rights."
     },
     "retention_expires_at": {"type": "string", "format": "date-time"},
     "upstream_tool": {"type": "string", "maxLength": 120}
   },
-  "anyOf": [
-    {"required": ["excerpt"]},
-    {"required": ["source_span"]}
+  "allOf": [
+    {
+      "anyOf": [
+        {"required": ["excerpt"]},
+        {"required": ["source_span"]}
+      ]
+    },
+    {
+      "if": {"properties": {"connector": {"const": "public_web"}}, "required": ["connector"]},
+      "then": {
+        "properties": {
+          "source_classification": {"const": "public"},
+          "dependency_classification_floor": {"const": "public"},
+          "classification": {"const": "public"},
+          "source_dependency_evidence_ids": {"maxItems": 0},
+          "authorization_sources": {"maxItems": 0}
+        },
+        "not": {"anyOf": [{"required": ["source_partition_id"]}, {"required": ["correlation_derivation"]}]}
+      },
+      "else": {
+        "required": ["source_partition_id"],
+        "properties": {"authorization_sources": {"minItems": 1}}
+      }
+    },
+    {
+      "if": {"required": ["correlation_derivation"]},
+      "then": {
+        "properties": {
+          "source_dependency_evidence_ids": {"minItems": 1},
+          "authorization_sources": {"minItems": 2}
+        }
+      },
+      "else": {
+        "properties": {
+          "source_dependency_evidence_ids": {"maxItems": 0},
+          "dependency_classification_floor": {"const": "public"}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"source_dependency_evidence_ids": {"minItems": 1}}, "required": ["source_dependency_evidence_ids"]},
+      "then": {"required": ["correlation_derivation"]}
+    }
   ]
 }
 

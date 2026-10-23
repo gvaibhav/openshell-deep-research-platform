@@ -7,7 +7,7 @@
   "additionalProperties": false,
   "required": ["subject", "actions", "expires_at"],
   "properties": {
-    "subject": {"type": "string", "minLength": 1, "maxLength": 500},
+    "subject": {"$ref": "human-subject.schema.json", "description": "Issuer-qualified proposed reader; the API resolves and rechecks the exact pair against the approved tenant directory."},
     "actions": {
       "type": "array",
       "minItems": 1,

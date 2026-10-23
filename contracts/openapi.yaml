@@ -30,8 +30,9 @@ paths:
         Treat visibility_selection as an untrusted choice, not an ACL: for
         okta_group, validate the stable group ID against the tenant allowlist,
         the submitter's current Okta membership, and group publishing policy.
-        Atomically bind owner_subject and tenant_id from the authenticated
-        session and create a separate access policy at version 1 with empty
+        Atomically bind owner_subject as the exact verified {iss, sub} pair and
+        tenant_id from the authenticated session, and create a separate access
+        policy at version 1 with empty
         reader_subjects. A submitter retains individual read access in group
         mode. Reject browser-supplied owner, tenant, grants, or arbitrary ACL.
       parameters:
@@ -65,8 +66,10 @@ paths:
       summary: List jobs visible to the signed-in user
       description: >-
         Filter by current tenant and the effective visibility predicate before
-        pagination. The predicate is owner_subject equals current subject, or
-        current membership in the exact bound Okta group, or an active explicit
+        pagination. The predicate is owner_subject equals the current exact
+        issuer-qualified {iss, sub} pair, or
+        current membership under owner_subject.iss in the exact bound Okta
+        group, or an active explicit
         reader_subject grant containing list_job; all branches require current
         tenant eligibility.
         A group name, old membership claim, tenant membership alone, or a public
@@ -76,7 +79,9 @@ paths:
         rechecks current group membership and ACL state. ACL changes invalidate
         relevant cursors. If an authorization dependency is
         unavailable, fail closed. report_available is computed for this viewer
-        and may be omitted when the full job-policy source check has not run.
+        only after the current independently verified cumulative job disclosure
+        envelope and source/classification read checks pass; omit it when that
+        complete decision has not run.
       parameters:
         - in: query
           name: cursor
@@ -123,8 +128,10 @@ paths:
         returning any status fields. If the ACL or current group eligibility
         cannot be verified,
         fail closed with the same 404 as an inaccessible job. report_available,
-        if present, is computed for this viewer after all approved private
-        job-policy source and resource checks, including uncited inputs.
+        if present, is computed for this viewer after current entitlement to
+        every exact private source/resource in the monotonic disclosure envelope
+        across all approved policy revisions, including uncited inputs, and
+        after the envelope head, digest, and highest-class checks pass.
       responses:
         '200':
           description: Current job state
@@ -152,9 +159,15 @@ paths:
         event delivery; close the stream promptly on revocation or unavailable
         ACL/group checks. Last-Event-ID is scoped to this job and never grants
         access or permits replay from another job. The API maps worker output
-        to trusted, neutral message templates. Suppress an evidence event for a
-        viewer without both read_evidence and current exact-source access;
-        evidence_id must never appear without that check. Never stream raw
+        to trusted, neutral message templates and coarse retrieval/synthesis/
+        verification phases. Warning/error issue_code values map to fixed
+        source/model/access/budget/policy messages; no connector, resource,
+        partition, or worker-supplied text is exposed. Suppress an evidence event for a
+        viewer without read_evidence, current access to every exact source and
+        resource in that evidence record's trusted transitive
+        authorization_sources closure, and clearance for its effective highest
+        classification; evidence_id must never appear without those checks.
+        Never stream raw
         source content, user prompts, worker prose, or credentials. The client
         can reconnect using
         Last-Event-ID, then fetch GET /v1/jobs/{job_id} to reconcile gaps.
@@ -215,13 +228,18 @@ paths:
       summary: Get an authorized, evidence-backed report
       description: >-
         Recheck current tenant and read_report visibility, report retention,
-        the classification of the question, attachments, and report, and current source-derived
-        access to every approved private source and resource in the immutable
-        job policy, including uncited inputs, before returning any report
-        fields. Treat an unavailable entitlement source as denied. Version 1
-        serves the complete report or nothing: if any policy source/resource
-        cannot be authorized, return the same 404 as an inaccessible report,
-        with no partial text, question, title, citations, or source metadata.
+        and current entitlement to every exact private source/resource in the
+        monotonic job disclosure envelope across all approved policy revisions,
+        including uncited and later-removed inputs. Require clearance for its
+        highest class, covering the original question, frozen admitted briefs,
+        attachments, source results, transferred dependencies, and the accepted
+        report. Before returning
+        any report field, verify the current independent job_source_scope_admitted
+        ledger head and the matching server-held report/envelope digest. A
+        missing ledger event, older projection, digest mismatch, or unavailable
+        source/classification check denies the read. Version 1 serves the
+        complete report or nothing: return the same 404 as an inaccessible
+        report, with no partial text, question, title, citations, or source metadata.
         A completed job can therefore have report_available false for this
         viewer. Return 409 only when an otherwise authorized report is not yet
         complete.
@@ -251,8 +269,10 @@ paths:
       description: >-
         Resolve evidence_id only within this job, then recheck current tenant
         eligibility, read_evidence visibility, evidence retention and
-        classification, and source-derived
-        authorization before revealing metadata or an excerpt. If any check or
+        effective highest classification, and current rights to every exact
+        source and resource in the record's trusted transitive
+        authorization_sources closure before revealing metadata or an excerpt.
+        If any check or
         dependency is unavailable, return the same 404 as unknown evidence.
         Return an authorized, sanitized view only. Internal artifact_ref and
         access_context_ref are never serialized to the browser. A public
@@ -280,7 +300,9 @@ paths:
       summary: Proxy an authorized retained evidence snapshot
       description: >-
         Resolve this evidence within the named job and recheck current tenant,
-        read_evidence visibility, retention, classification, and source-derived access
+        read_evidence visibility, retention, effective highest classification,
+        and current rights to every exact source and resource in the record's
+        trusted transitive authorization_sources closure
         before opening an encrypted server-held artifact. Recheck on bounded
         checkpoints during long streams and abort promptly on revocation.
         Return 404 if any authorization input is denied or unavailable. The
@@ -351,7 +373,8 @@ paths:
         Require manage_visibility entitlement and tenant/source sharing policy
         for the owner or explicitly authorized job-specific steward. Replace
         only reader_subjects using the strong ETag from GET; reject stale
-        versions and missing If-Match. Validate every proposed subject's
+        versions and missing If-Match. Validate every proposed subject's exact
+        issuer-qualified {iss, sub} pair and
         current tenant eligibility, allowed read actions, and future expiry
         within the tenant maximum. The API assigns grant IDs and grantor/time
         audit fields, rejects duplicate subjects, and logs each add/change/
@@ -551,16 +574,20 @@ components:
             - POLICY_DENIED
             - RESEARCH_FAILED
             - REVIEW_REQUIRED
+            - MODEL_UNAVAILABLE
             - SOURCE_ACCESS_REVOKED
             - SOURCE_UNAVAILABLE
         report_available:
           type: boolean
           description: >-
-            Viewer-specific result of current job, classification, and every
-            approved private job-policy source/resource check, including
-            uncited inputs.
+            Viewer-specific result of current job visibility, independent
+            job_source_scope_admitted ledger head and matching report/envelope
+            digest, highest classification, and current entitlement to every
+            exact private source/resource admitted across all approved policy
+            revisions, including uncited or later-removed inputs.
             True only when GET report can return the entire report now; false
-            on denial or unavailable source checks. Omit if not evaluated.
+            on denial or unavailable source/classification checks. Omit if the
+            complete decision was not evaluated.
     ApiError:
       type: object
       additionalProperties: false

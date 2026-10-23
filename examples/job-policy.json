@@ -2,7 +2,7 @@
   "job_id": "11111111-1111-4111-8111-111111111111",
   "policy_version": 1,
   "tenant_id": "tenant-example",
-  "user_subject": "00u-example-user",
+  "user_subject": {"iss": "https://okta.example.invalid/oauth2/dashboard", "sub": "00u-example-user"},
   "created_at": "2026-10-23T12:00:00Z",
   "expires_at": "2026-10-23T13:00:00Z",
   "mode": "combined",
@@ -29,10 +29,44 @@
       "resource_ids": ["projects/example-prod"]
     }
   ],
+  "source_partitions": [
+    {
+      "partition_id": "github_repo",
+      "source": {
+        "connector": "github",
+        "connection_ref": "conn_github_example",
+        "resource_ids": ["example-org/research-service"]
+      },
+      "research_brief": "Investigate the selected research-service repository for changes relevant to the recent latency incident.",
+      "brief_approval_ref": "decision-github-brief-example-1"
+    },
+    {
+      "partition_id": "slack_channel",
+      "source": {
+        "connector": "slack",
+        "connection_ref": "conn_slack_example",
+        "resource_ids": ["C0123456789"]
+      },
+      "research_brief": "Investigate the selected incident channel for the recent research-service latency incident and its resolution.",
+      "brief_approval_ref": "decision-slack-brief-example-1"
+    },
+    {
+      "partition_id": "gcp_logs",
+      "source": {
+        "connector": "gcp_logging",
+        "connection_ref": "conn_gcp_example",
+        "resource_ids": ["projects/example-prod"]
+      },
+      "research_brief": "Investigate selected application logs for the recent research-service latency incident and its resolution.",
+      "brief_approval_ref": "decision-gcp-brief-example-1"
+    }
+  ],
+  "cross_partition_transfer_grants": [],
   "model_route": "approved-enterprise-model",
   "classification": "confidential",
   "limits": {
     "wall_time_seconds": 3600,
+    "max_model_requests": 200,
     "max_model_tokens": 200000,
     "max_tool_calls": 300,
     "max_source_bytes": 52428800,
@@ -47,6 +81,8 @@
     "search_github",
     "read_github_file",
     "search_slack",
-    "list_log_entries"
+    "list_log_entries",
+    "read_evidence",
+    "validate_report"
   ]
 }

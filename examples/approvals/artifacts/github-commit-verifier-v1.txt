@@ -1,0 +1,6 @@
+Synthetic fixture artifact: github-commit-verifier-v1
+Independently request the GitHub commit object under the selected repository connection,
+verify authenticated response provenance, selected repository, immutable object identity,
+and equality of its provider-generated sha to the extracted candidate before issuing a key.
+Reject missing proof, resource mismatch, user-authored substitutions, or changed object identity.
+This fixture is not a deployed verifier; production binds the digest of its immutable release artifact.

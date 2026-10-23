@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://schemas.openshell-deep-research.invalid/v1/job-event.schema.json",
   "title": "Research job event",
-  "description": "Small viewer-specific status event. The API maps untrusted worker output to trusted static templates and suppresses evidence events unless the viewer has current read_evidence and exact-source authorization; raw source content, worker prose, and credentials are excluded. Recheck job and source access for replay and live delivery.",
+  "description": "Small viewer-specific event. The trusted API maps worker signals to fixed type/message/issue-code pairs and a coarse phase; worker-controlled text, source identities, resource names, credentials, and raw errors never enter these fields. Only an authorized evidence event may carry evidence_id. Suppress evidence events unless the viewer has current read_evidence, effective-classification clearance, and rights to the evidence's full trusted primary-plus-transitive source/resource authorization closure. Recheck job and dependency access for replay and live delivery.",
   "type": "object",
   "additionalProperties": false,
   "required": ["event_id", "job_id", "sequence", "at", "type", "message"],
@@ -15,6 +15,16 @@
     "status": {
       "type": "string",
       "enum": ["submitted", "authorized", "queued", "provisioning", "running", "awaiting_review", "completing", "completed", "failed", "canceled", "expired"]
+    },
+    "stage": {
+      "type": "string",
+      "enum": ["retrieval", "synthesis", "verification"],
+      "description": "Trusted coarse research phase, with no connector, source partition, resource, sandbox, or attempt identity. Required for running/completing status, progress, and evidence events; optional on warning/error events."
+    },
+    "issue_code": {
+      "type": "string",
+      "enum": ["ACCESS_CHECK_UNAVAILABLE", "BUDGET_EXCEEDED", "MODEL_UNAVAILABLE", "POLICY_DENIED", "RESEARCH_FAILED", "SOURCE_ACCESS_REVOKED", "SOURCE_UNAVAILABLE"],
+      "description": "Trusted finite failure category for warning/error events only. The code and neutral message must match; raw vendor errors, source names, and worker-supplied codes are never accepted."
     },
     "message": {
       "type": "string",
@@ -32,14 +42,74 @@
         "Job canceled.",
         "Job expired.",
         "Evidence captured.",
-        "Source access requires review."
+        "Source access requires review.",
+        "A research source is unavailable.",
+        "Research model is unavailable.",
+        "Access check is unavailable.",
+        "Job budget reached.",
+        "Research stopped by policy.",
+        "Research failed."
       ]
     },
     "evidence_id": {
       "type": "string", "format": "uuid",
-      "description": "Only emit if this viewer can currently GET the scoped evidence endpoint; otherwise suppress the entire evidence event."
+      "description": "Only emit if this viewer can currently GET the scoped evidence endpoint after all transitive dependency and effective-classification checks; otherwise suppress the entire evidence event."
     },
     "progress_percent": {"type": "integer", "minimum": 0, "maximum": 100}
-  }
+  },
+  "oneOf": [
+    {
+      "properties": {"type": {"const": "status"}},
+      "required": ["status"],
+      "not": {"anyOf": [{"required": ["evidence_id"]}, {"required": ["issue_code"]}]},
+      "oneOf": [
+        {"properties": {"status": {"const": "submitted"}, "message": {"const": "Job submitted."}}, "not": {"required": ["stage"]}},
+        {"properties": {"status": {"const": "authorized"}, "message": {"const": "Job authorized."}}, "not": {"required": ["stage"]}},
+        {"properties": {"status": {"const": "queued"}, "message": {"const": "Job queued."}}, "not": {"required": ["stage"]}},
+        {"properties": {"status": {"const": "provisioning"}, "message": {"const": "Research environment starting."}}, "not": {"required": ["stage"]}},
+        {"properties": {"status": {"const": "running"}, "message": {"const": "Research in progress."}}, "required": ["stage"]},
+        {"properties": {"status": {"const": "awaiting_review"}, "message": {"const": "Review required."}}, "not": {"required": ["stage"]}},
+        {"properties": {"status": {"const": "completing"}, "message": {"const": "Report being prepared."}, "stage": {"const": "verification"}}, "required": ["stage"]},
+        {"properties": {"status": {"const": "completed"}, "message": {"const": "Job completed."}}, "not": {"required": ["stage"]}},
+        {"properties": {"status": {"const": "failed"}, "message": {"const": "Job failed."}}, "not": {"required": ["stage"]}},
+        {"properties": {"status": {"const": "canceled"}, "message": {"const": "Job canceled."}}, "not": {"required": ["stage"]}},
+        {"properties": {"status": {"const": "expired"}, "message": {"const": "Job expired."}}, "not": {"required": ["stage"]}}
+      ]
+    },
+    {
+      "properties": {"type": {"const": "progress"}, "message": {"const": "Research in progress."}},
+      "required": ["stage"],
+      "not": {"anyOf": [{"required": ["status"]}, {"required": ["evidence_id"]}, {"required": ["issue_code"]}]}
+    },
+    {
+      "properties": {"type": {"const": "evidence"}, "message": {"const": "Evidence captured."}, "stage": {"const": "retrieval"}},
+      "required": ["stage", "evidence_id"],
+      "not": {"anyOf": [{"required": ["status"]}, {"required": ["issue_code"]}]}
+    },
+    {
+      "properties": {"type": {"const": "warning"}},
+      "required": ["issue_code"],
+      "not": {"anyOf": [{"required": ["status"]}, {"required": ["evidence_id"]}]},
+      "oneOf": [
+        {"properties": {"issue_code": {"const": "SOURCE_ACCESS_REVOKED"}, "message": {"const": "Source access requires review."}}},
+        {"properties": {"issue_code": {"const": "SOURCE_UNAVAILABLE"}, "message": {"const": "A research source is unavailable."}}},
+        {"properties": {"issue_code": {"const": "MODEL_UNAVAILABLE"}, "message": {"const": "Research model is unavailable."}}},
+        {"properties": {"issue_code": {"const": "ACCESS_CHECK_UNAVAILABLE"}, "message": {"const": "Access check is unavailable."}}}
+      ]
+    },
+    {
+      "properties": {"type": {"const": "error"}},
+      "required": ["issue_code"],
+      "not": {"anyOf": [{"required": ["status"]}, {"required": ["evidence_id"]}]},
+      "oneOf": [
+        {"properties": {"issue_code": {"const": "SOURCE_UNAVAILABLE"}, "message": {"const": "A research source is unavailable."}}},
+        {"properties": {"issue_code": {"const": "MODEL_UNAVAILABLE"}, "message": {"const": "Research model is unavailable."}}},
+        {"properties": {"issue_code": {"const": "ACCESS_CHECK_UNAVAILABLE"}, "message": {"const": "Access check is unavailable."}}},
+        {"properties": {"issue_code": {"const": "BUDGET_EXCEEDED"}, "message": {"const": "Job budget reached."}}},
+        {"properties": {"issue_code": {"const": "POLICY_DENIED"}, "message": {"const": "Research stopped by policy."}}},
+        {"properties": {"issue_code": {"const": "RESEARCH_FAILED"}, "message": {"const": "Research failed."}}}
+      ]
+    }
+  ]
 }
 

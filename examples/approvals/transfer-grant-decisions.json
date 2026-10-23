@@ -1,0 +1,20 @@
+{
+  "approval_ref": "decisions-github-export-and-slack-template-1",
+  "grant_scope_sha256": "3346559e4bc1587d142cc51206ae1679a1963366eb41f877b38d5197c16cb229",
+  "source_export": {
+    "decision": "approved",
+    "grant_scope_sha256": "3346559e4bc1587d142cc51206ae1679a1963366eb41f877b38d5197c16cb229",
+    "actor_subject": {"iss": "https://okta.example.invalid/oauth2/dashboard", "sub": "00u-github-source-owner-example"},
+    "authority_ref": "github-source-owner-example",
+    "approved_at": "2026-10-23T12:29:58Z",
+    "signed_proof_ref": "synthetic-source-export-proof"
+  },
+  "destination_acceptance": {
+    "decision": "approved",
+    "grant_scope_sha256": "3346559e4bc1587d142cc51206ae1679a1963366eb41f877b38d5197c16cb229",
+    "actor_subject": {"iss": "https://okta.example.invalid/oauth2/dashboard", "sub": "00u-slack-destination-owner-example"},
+    "authority_ref": "slack-destination-owner-example",
+    "approved_at": "2026-10-23T12:29:59Z",
+    "signed_proof_ref": "synthetic-destination-template-proof"
+  }
+}

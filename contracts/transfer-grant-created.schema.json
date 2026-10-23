@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openshell-deep-research.invalid/v1/transfer-grant-created.schema.json",
+  "title": "Independent-ledger transfer grant creation",
+  "description": "Trusted append-only authorization event written before approval acknowledgement. It reserves a never-reused grant ID and binds the immutable grant scope and authenticated A/B decision set across application or broker PITR. It is not a browser or worker payload.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "event_id", "event_type", "tenant_sequence", "tenant_id", "job_id",
+    "policy_version", "grant_id", "approval_ref", "approval_idempotency_ref", "approved_at",
+    "destination_template_sha256", "destination_renderer_artifact_version",
+    "destination_renderer_artifact_sha256", "source_extractor_artifact_version",
+    "source_extractor_artifact_sha256", "source_verifier_artifact_version",
+    "source_verifier_artifact_sha256", "grant_scope_sha256", "approval_decisions_sha256",
+    "recorded_at"
+  ],
+  "properties": {
+    "event_id": {"type": "string", "format": "uuid"},
+    "event_type": {"const": "transfer_grant_created"},
+    "tenant_sequence": {"type": "integer", "minimum": 1},
+    "tenant_id": {"type": "string", "minLength": 1, "maxLength": 200},
+    "job_id": {"type": "string", "format": "uuid"},
+    "policy_version": {"type": "integer", "minimum": 1},
+    "grant_id": {
+      "type": "string", "format": "uuid",
+      "description": "Globally unique, server-generated ID. A durable global grant-ID uniqueness index in the independent ledger rejects reuse across tenants, jobs, revisions, rollback, and restore; random UUID generation alone is insufficient. Only the same approval transaction may retry idempotently with identical event binding."
+    },
+    "approval_ref": {
+      "type": "string", "minLength": 1, "maxLength": 300,
+      "description": "Opaque reference to the authenticated A-export and B-template decision set named by the immutable job policy grant."
+    },
+    "approval_idempotency_ref": {
+      "type": "string", "minLength": 1, "maxLength": 300,
+      "description": "Server-generated identity of the exact approval transaction. It permits only an identical retry after an uncertain append or recoverable policy commit failure."
+    },
+    "approved_at": {
+      "type": "string", "format": "date-time",
+      "description": "Time the second required decision completed; matches the immutable grant's approved_at and is checked against both decisions in approval_decisions_sha256. It is recorded after approval and therefore is not part of the scope the two decisions sign."
+    },
+    "destination_template_sha256": {
+      "type": "string", "pattern": "^[0-9a-f]{64}$",
+      "description": "Digest of the pinned, reviewed destination template bytes, including its exact declarative upstream argument expression and renderer artifact version/digest."
+    },
+    "destination_renderer_artifact_version": {"type": "string", "minLength": 1, "maxLength": 200},
+    "destination_renderer_artifact_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "source_extractor_artifact_version": {"type": "string", "minLength": 1, "maxLength": 200},
+    "source_extractor_artifact_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "source_verifier_artifact_version": {"type": "string", "minLength": 1, "maxLength": 200},
+    "source_verifier_artifact_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "grant_scope_sha256": {
+      "type": "string", "pattern": "^[0-9a-f]{64}$",
+      "description": "Digest of v1 canonical UTF-8 JSON containing tenant_id, job_id, policy_version, the immutable grant authorization fields (including grant_id, tool, limits, and expiry but excluding post-decision approval_ref and approved_at), exact source/destination partition selectors, destination template digest, and all source extractor/verifier and destination renderer artifact version/digest bindings. The event separately binds approval_ref and approved_at to its decision-set hash. V1 sorts object keys lexicographically, uses compact comma/colon separators and unescaped Unicode, and rejects duplicate keys or non-finite numbers."
+    },
+    "approval_decisions_sha256": {
+      "type": "string", "pattern": "^[0-9a-f]{64}$",
+      "description": "Digest of the authenticated, tamper-evident A-export/declassification and B-template/resource acceptance decision set bound to grant_scope_sha256, using the same v1 canonical JSON rule. Runtime verifies both decisions' signatures or equivalent proof, actor authorities, scope, and times."
+    },
+    "recorded_at": {"type": "string", "format": "date-time"}
+  }
+}

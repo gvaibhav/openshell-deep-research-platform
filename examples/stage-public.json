@@ -20,6 +20,7 @@
   "classification": "public",
   "limits": {
     "wall_time_seconds": 900,
+    "max_model_requests": 20,
     "max_model_tokens": 30000,
     "max_tool_calls": 50,
     "max_source_bytes": 10485760,

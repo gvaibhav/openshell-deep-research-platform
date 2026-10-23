@@ -8,7 +8,7 @@
   "required": ["grant_id", "subject", "actions", "expires_at", "granted_at", "granted_by_subject"],
   "properties": {
     "grant_id": {"type": "string", "format": "uuid"},
-    "subject": {"type": "string", "minLength": 1, "maxLength": 500},
+    "subject": {"$ref": "human-subject.schema.json", "description": "Verified issuer-qualified reader identity; checked for current tenant, source, and classification eligibility at read time."},
     "actions": {
       "type": "array",
       "minItems": 1,
@@ -17,6 +17,6 @@
     },
     "expires_at": {"type": "string", "format": "date-time"},
     "granted_at": {"type": "string", "format": "date-time"},
-    "granted_by_subject": {"type": "string", "minLength": 1, "maxLength": 500}
+    "granted_by_subject": {"$ref": "human-subject.schema.json", "description": "Server-derived issuer-qualified grantor identity at approval time."}
   }
 }

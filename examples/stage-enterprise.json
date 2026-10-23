@@ -5,44 +5,36 @@
   "sandbox_id": "sandbox-enterprise-example-1",
   "fencing_generation": 2,
   "policy_version": 1,
-  "stage": "enterprise",
-  "research_brief": "What caused the recent research-service latency incident, and how was it resolved? Compare public documentation with the selected repository, incident channel, and application logs.",
+  "stage": "enterprise_retrieval",
+  "source_partition_id": "github_repo",
+  "retrieval_mode": "standard",
+  "research_brief": "Investigate the selected research-service repository for changes relevant to the recent latency incident.",
   "issued_at": "2026-10-23T12:15:00Z",
-  "expires_at": "2026-10-23T13:00:00Z",
+  "expires_at": "2026-10-23T12:30:00Z",
   "approved_sources": [
     {
       "connector": "github",
       "connection_ref": "conn_github_example",
       "resource_ids": ["example-org/research-service"]
-    },
-    {
-      "connector": "slack",
-      "connection_ref": "conn_slack_example",
-      "resource_ids": ["C0123456789"]
-    },
-    {
-      "connector": "gcp_logging",
-      "connection_ref": "conn_gcp_example",
-      "resource_ids": ["projects/example-prod"]
     }
   ],
   "allowed_tools": [
     "search_github",
     "read_github_file",
-    "search_slack",
-    "list_log_entries"
+    "read_evidence"
   ],
   "model_route": "approved-enterprise-model",
   "classification": "confidential",
   "limits": {
-    "wall_time_seconds": 2700,
-    "max_model_tokens": 170000,
-    "max_tool_calls": 250,
-    "max_source_bytes": 41943040,
-    "max_output_bytes": 8388608,
-    "max_sources": 80,
-    "max_subagents": 3,
-    "max_estimated_cost_usd": 17.0
+    "wall_time_seconds": 900,
+    "max_model_requests": 70,
+    "max_model_tokens": 70000,
+    "max_tool_calls": 125,
+    "max_source_bytes": 31457280,
+    "max_output_bytes": 4194304,
+    "max_sources": 60,
+    "max_subagents": 2,
+    "max_estimated_cost_usd": 7.0
   },
   "context_evidence_ids": ["55555555-5555-4555-8555-555555555555"]
 }

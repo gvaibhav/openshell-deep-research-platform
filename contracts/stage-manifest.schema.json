@@ -18,24 +18,38 @@
     "sandbox_id": {"type": "string", "minLength": 1, "maxLength": 300},
     "fencing_generation": {"type": "integer", "minimum": 1},
     "policy_version": {"type": "integer", "minimum": 1},
-    "stage": {"type": "string", "enum": ["public", "enterprise"]},
+    "stage": {"type": "string", "enum": ["public", "enterprise_retrieval", "enterprise_synthesis"]},
     "research_brief": {"type": "string", "minLength": 10, "maxLength": 12000},
     "issued_at": {"type": "string", "format": "date-time"},
     "expires_at": {"type": "string", "format": "date-time"},
     "approved_sources": {
-      "type": "array", "minItems": 1, "maxItems": 20,
+      "type": "array", "maxItems": 20,
       "items": {"$ref": "source-selection.schema.json"}
     },
     "allowed_tools": {"$ref": "job-policy.schema.json#/properties/allowed_tools"},
-    "model_route": {"type": "string", "minLength": 1, "maxLength": 200},
+    "source_partition_id": {
+      "type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$",
+      "description": "Trusted source partition binding for exactly one private retrieval sandbox."
+    },
+    "retrieval_mode": {
+      "type": "string", "enum": ["standard", "correlation_only"],
+      "description": "Private retrieval capability mode. A correlation-only attempt accepts opaque key IDs but has no worker-controlled source query, path, or filter tool; the broker enforces this mode independently."
+    },
+    "inbound_correlation_key_ids": {
+      "type": "array", "maxItems": 40, "uniqueItems": true,
+      "items": {"type": "string", "format": "uuid"},
+      "description": "Opaque broker-issued key IDs authorized for this destination partition; at most 40 so every key and grant ID fits the required internal evidence derivation record. Admission also computes the exact origin-evidence and source/resource closure against all evidence-schema caps before projection. No source text or key value is projected."
+    },
+    "model_route": {"type": "string", "minLength": 1, "maxLength": 200, "description": "Server-held alias resolved and enforced by the trusted model request gate; this field alone does not constrain a native model request."},
     "classification": {
-      "type": "string", "enum": ["public", "internal", "confidential", "restricted"]
+      "type": "string", "enum": ["public", "internal", "confidential", "restricted"],
+      "description": "Maximum data class admitted to this stage and its pinned model/trace route; the controller and broker reject or quarantine higher-class inputs before worker delivery."
     },
     "limits": {"$ref": "job-policy.schema.json#/properties/limits"},
     "context_evidence_ids": {
       "type": "array", "maxItems": 100, "uniqueItems": true,
       "items": {"type": "string", "format": "uuid"},
-      "description": "Reviewed public evidence projected into a private stage; never a reference to unreviewed private data."
+      "description": "Curated evidence for this stage. Standard private retrieval may see reviewed public and independent same-partition evidence only; it cannot read foreign-dependent or correlation-tainted evidence even from its own partition. Correlation-only retrieval may read reviewed public and evidence captured in its own tainted attempt only. Synthesis may see authorized evidence from all partitions. The Job API checks trusted producing_attempt_id, retrieval mode, dependency closure, and provenance before release."
     }
   },
   "allOf": [
@@ -44,24 +58,77 @@
       "then": {
         "properties": {
           "classification": {"const": "public"},
-          "approved_sources": {
+          "approved_sources": {"minItems": 1, "maxItems": 1,
             "items": {"properties": {"connector": {"const": "public_web"}}}
           },
           "allowed_tools": {
-            "items": {"enum": ["search_public_web", "fetch_public_page"]}
+            "items": {"enum": ["search_public_web", "fetch_public_page", "read_evidence", "validate_report"]}
           },
           "context_evidence_ids": {"maxItems": 0}
-        }
+        },
+        "not": {"anyOf": [
+          {"required": ["source_partition_id"]},
+          {"required": ["retrieval_mode"]},
+          {"required": ["inbound_correlation_key_ids"]}
+        ]}
       },
       "else": {
         "properties": {
-          "approved_sources": {
-            "items": {"properties": {"connector": {"not": {"const": "public_web"}}}}
-          },
           "allowed_tools": {
             "items": {"not": {"enum": ["search_public_web", "fetch_public_page"]}}
           }
         }
+      }
+    },
+    {
+      "if": {"properties": {"stage": {"const": "enterprise_retrieval"}}},
+      "then": {
+        "required": ["source_partition_id", "retrieval_mode"],
+        "properties": {
+          "approved_sources": {
+            "minItems": 1, "maxItems": 1,
+            "items": {"properties": {"connector": {"not": {"const": "public_web"}}}}
+          },
+          "allowed_tools": {
+            "items": {"not": {"enum": ["validate_report"]}}
+          }
+        },
+        "allOf": [
+          {
+            "if": {"properties": {"retrieval_mode": {"const": "standard"}}},
+            "then": {
+              "not": {"required": ["inbound_correlation_key_ids"]},
+              "properties": {"allowed_tools": {"items": {"not": {"const": "search_by_correlation_key"}}}}
+            },
+            "else": {
+              "required": ["inbound_correlation_key_ids"],
+              "properties": {
+                "inbound_correlation_key_ids": {"minItems": 1},
+                "allowed_tools": {
+                  "items": {"enum": ["search_by_correlation_key", "read_evidence"]},
+                  "contains": {"const": "search_by_correlation_key"}
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {"properties": {"stage": {"const": "enterprise_synthesis"}}},
+      "then": {
+        "properties": {
+          "approved_sources": {"maxItems": 0},
+          "allowed_tools": {
+            "items": {"enum": ["read_evidence", "validate_report"]},
+            "contains": {"const": "read_evidence"}
+          }
+        },
+        "not": {"anyOf": [
+          {"required": ["source_partition_id"]},
+          {"required": ["retrieval_mode"]},
+          {"required": ["inbound_correlation_key_ids"]}
+        ]}
       }
     }
   ]

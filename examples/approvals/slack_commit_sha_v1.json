@@ -1,0 +1,17 @@
+{
+  "template_id": "slack_commit_sha_v1",
+  "upstream_tool": "search_slack",
+  "resource_id": "C0123456789",
+  "typed_parameter": "commit_sha",
+  "key_validation": {
+    "pattern": "^[0-9a-f]{40}$",
+    "max_utf8_bytes": 40
+  },
+  "argument_expression": {
+    "channel_id": {"literal": "C0123456789"},
+    "query": {"concat": [{"literal": "commit:"}, {"typed_key": "commit_sha"}]},
+    "limit": {"literal": 10}
+  },
+  "renderer_artifact_version": "slack-query-renderer-v1",
+  "renderer_artifact_sha256": "5ef64b4f71dda2e8ccc9a71afcf51a34caddb7782fdb3a5c9abcbf1724aaacae"
+}

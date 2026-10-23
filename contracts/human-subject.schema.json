@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openshell-deep-research.invalid/v1/human-subject.schema.json",
+  "title": "Canonical application human subject",
+  "description": "Issuer-qualified application identity. iss is the exact validated ID-token issuer or approved directory issuer and sub is that issuer's exact opaque subject. Compare the ordered pair exactly, without URL, case, whitespace, email, or display-name normalization. A gateway whoami.subject or client-credentials sub is a separate principal namespace and cannot substitute for this object.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["iss", "sub"],
+  "properties": {
+    "iss": {"type": "string", "format": "uri", "pattern": "^https://[^?#]+$", "maxLength": 2048},
+    "sub": {"type": "string", "minLength": 1, "maxLength": 500}
+  }
+}

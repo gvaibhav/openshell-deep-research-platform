@@ -1,8 +1,10 @@
 {
   "evidence_id": "33333333-3333-4333-8333-333333333333",
   "job_id": "11111111-1111-4111-8111-111111111111",
+  "producing_attempt_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
   "tool_call_id": "44444444-4444-4444-8444-444444444444",
   "connector": "github",
+  "source_partition_id": "github_repo",
   "resource_uri": "https://github.com/example-org/research-service/blob/0123456789abcdef0123456789abcdef01234567/src/query.py",
   "source_locator": "example-org/research-service@0123456789abcdef0123456789abcdef01234567:src/query.py",
   "title": "Query timeout change",
@@ -11,7 +13,20 @@
   "artifact_ref": "obj-evidence-example-1",
   "excerpt": "The query timeout was increased from 5 seconds to 30 seconds.",
   "source_span": "src/query.py lines 10-14",
+  "source_classification": "confidential",
+  "dependency_classification_floor": "public",
   "classification": "confidential",
+  "source_dependency_evidence_ids": [],
+  "authorization_sources": [
+    {
+      "partition_id": "github_repo",
+      "source": {
+        "connector": "github",
+        "connection_ref": "conn_github_example",
+        "resource_ids": ["example-org/research-service"]
+      }
+    }
+  ],
   "access_context_ref": "ctx-github-example-1",
   "upstream_tool": "read_github_file"
 }

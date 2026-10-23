@@ -4,7 +4,7 @@
   "sequence": 7,
   "at": "2026-10-23T12:21:00Z",
   "type": "evidence",
-  "status": "running",
+  "stage": "retrieval",
   "message": "Evidence captured.",
   "evidence_id": "33333333-3333-4333-8333-333333333333",
   "progress_percent": 42
