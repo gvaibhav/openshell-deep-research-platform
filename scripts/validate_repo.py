@@ -45,6 +45,16 @@ EXAMPLE_SCHEMAS = {
 }
 CLASS_RANK = {"public": 0, "internal": 1, "confidential": 2, "restricted": 3}
 LINK_RE = re.compile(r"(?<!!)\[[^\]]+\]\(([^)]+)\)")
+CR_FILE_RE = re.compile(r"^(CR-\d{4})-[a-z0-9]+(?:-[a-z0-9]+)*\.md$")
+CR_ID_RE = re.compile(r"^\s*(?:-\s*)?\*\*ID:\*\*\s*(CR-\d{4})\s*$", re.MULTILINE)
+CR_STATUS_RE = re.compile(r"^\s*(?:-\s*)?\*\*Status:\*\*\s*(.+?)\s*$", re.MULTILINE)
+CR_IMPACT_RE = re.compile(r"^\s*(?:-\s*)?\*\*Impact ID:\*\*\s*(\S+)\s*$", re.MULTILINE)
+CR_PRIMARY_RE = re.compile(r"^\s*(?:-\s*)?\*\*Primary design:\*\*\s*\[[^\]]+\]\(([^)]+)\)\s*$", re.MULTILINE)
+CR_STATUSES = ("Open", "In progress", "Deferred", "Verified", "Withdrawn")
+CR_PRIMARY_DESIGN_FILES = frozenset(
+    {ROOT / "docs" / "architecture.md", ROOT / "docs" / "okta" / "requirements-and-design.md"}
+)
+CR_PRIMARY_DESIGN_ROOTS = (ROOT / "docs" / "design", ROOT / "docs" / "decisions")
 MERMAID_STARTS = (
     "flowchart ",
     "graph ",
@@ -940,6 +950,106 @@ def check_contracts(errors: list[str]) -> tuple[int, int]:
     return len(schemas), len(examples)
 
 
+def local_markdown_links(path: Path) -> set[Path]:
+    """Resolve local Markdown targets for CR/ToDo backlink checks."""
+    links: set[Path] = set()
+    for match in LINK_RE.finditer(path.read_text(encoding="utf-8")):
+        target = match.group(1).split("#", 1)[0].strip()
+        if not target or target.startswith(("https://", "http://", "mailto:", "tel:", "data:", "#")):
+            continue
+        if target.startswith("<") and target.endswith(">"):
+            target = target[1:-1]
+        links.add((path.parent / unquote(target)).resolve())
+    return links
+
+
+def check_change_requests(errors: list[str]) -> int:
+    """Keep each implementation impact linked from design to its paired work list."""
+    cr_files = sorted((ROOT / "docs" / "change-requests").glob("CR-*.md"))
+    todo_files = sorted((ROOT / "docs" / "todos").glob("CR-*.md"))
+    ids: dict[str, list[Path]] = {}
+    impacts: dict[str, list[Path]] = {}
+    metadata: dict[Path, tuple[str | None, str | None, str | None]] = {}
+    for path in [*cr_files, *todo_files]:
+        match = CR_FILE_RE.fullmatch(path.name)
+        if match is None:
+            errors.append(f"Invalid CR/ToDo filename: {path.relative_to(ROOT)}")
+            continue
+        expected_id = match.group(1)
+        ids.setdefault(f"{path.parent.name}:{expected_id}", []).append(path)
+        header = "\n".join(path.read_text(encoding="utf-8").splitlines()[:15])
+        found_ids = CR_ID_RE.findall(header)
+        statuses = CR_STATUS_RE.findall(header)
+        impact_ids = CR_IMPACT_RE.findall(header)
+        if len(found_ids) != 1 or found_ids[0] != expected_id:
+            errors.append(f"{path.relative_to(ROOT)}: expected one **ID:** {expected_id} near the top")
+        if len(statuses) != 1:
+            errors.append(f"{path.relative_to(ROOT)}: expected one **Status:** near the top")
+        elif statuses[0].strip() not in CR_STATUSES:
+            errors.append(
+                f"{path.relative_to(ROOT)}: unsupported **Status:** {statuses[0].strip()!r}; "
+                f"use one of {', '.join(CR_STATUSES)}"
+            )
+        if len(impact_ids) != 1:
+            errors.append(f"{path.relative_to(ROOT)}: expected one **Impact ID:** near the top")
+        if path.parent.name == "change-requests" and len(impact_ids) == 1:
+            impacts.setdefault(impact_ids[0], []).append(path)
+        metadata[path] = (
+            found_ids[0] if len(found_ids) == 1 else None,
+            statuses[0].strip() if len(statuses) == 1 else None,
+            impact_ids[0] if len(impact_ids) == 1 else None,
+        )
+
+    for duplicate in ids.values():
+        if len(duplicate) > 1:
+            errors.append("Duplicate CR ID: " + ", ".join(str(path.relative_to(ROOT)) for path in duplicate))
+    for duplicate in impacts.values():
+        if len(duplicate) > 1:
+            errors.append("Duplicate impact ID: " + ", ".join(str(path.relative_to(ROOT)) for path in duplicate))
+
+    cr_by_name = {path.name: path for path in cr_files}
+    todo_by_name = {path.name: path for path in todo_files}
+    for name in sorted(cr_by_name.keys() ^ todo_by_name.keys()):
+        orphan = cr_by_name.get(name) or todo_by_name[name]
+        errors.append(f"Unpaired CR/ToDo document: {orphan.relative_to(ROOT)}")
+
+    readme_links = local_markdown_links(ROOT / "README.md")
+    index_path = ROOT / "docs" / "TODO.md"
+    index_links = local_markdown_links(index_path)
+    for name in sorted(cr_by_name.keys() & todo_by_name.keys()):
+        cr, todo = cr_by_name[name], todo_by_name[name]
+        if metadata.get(cr, (None, None, None))[1] != metadata.get(todo, (None, None, None))[1]:
+            errors.append(f"{name}: CR and ToDo statuses differ")
+        if metadata.get(cr, (None, None, None))[2] != metadata.get(todo, (None, None, None))[2]:
+            errors.append(f"{name}: CR and ToDo impact IDs differ")
+        if todo not in local_markdown_links(cr):
+            errors.append(f"{cr.relative_to(ROOT)}: missing link to paired ToDo")
+        if cr not in local_markdown_links(todo):
+            errors.append(f"{todo.relative_to(ROOT)}: missing link to paired CR")
+        for source, links in ((ROOT / "README.md", readme_links), (index_path, index_links)):
+            if cr not in links or todo not in links:
+                errors.append(f"{source.relative_to(ROOT)}: missing direct CR and ToDo links for {name}")
+        cr_header = "\n".join(cr.read_text(encoding="utf-8").splitlines()[:15])
+        primary_links = CR_PRIMARY_RE.findall(cr_header)
+        if len(primary_links) != 1:
+            errors.append(f"{cr.relative_to(ROOT)}: expected one linked **Primary design:** near the top")
+            continue
+        primary = (cr.parent / unquote(primary_links[0].split("#", 1)[0])).resolve()
+        if not primary.is_file() or not (
+            primary in CR_PRIMARY_DESIGN_FILES
+            or any(primary.is_relative_to(folder) for folder in CR_PRIMARY_DESIGN_ROOTS)
+        ):
+            errors.append(f"{cr.relative_to(ROOT)}: primary design must be a local ADR or design document")
+            continue
+        primary_links_resolved = local_markdown_links(primary)
+        if cr not in primary_links_resolved or todo not in primary_links_resolved:
+            errors.append(f"{primary.relative_to(ROOT)}: missing direct CR and ToDo links for {name}")
+        impact_id = metadata.get(cr, (None, None, None))[2]
+        if impact_id and impact_id not in primary.read_text(encoding="utf-8"):
+            errors.append(f"{primary.relative_to(ROOT)}: missing impact ID {impact_id}")
+    return len(cr_by_name.keys() & todo_by_name.keys())
+
+
 def check_markdown(errors: list[str]) -> tuple[int, int]:
     diagrams = 0
     paths = [ROOT / "README.md", ROOT / "AGENTS.md", *sorted((ROOT / "docs").rglob("*.md"))]
@@ -949,6 +1059,7 @@ def check_markdown(errors: list[str]) -> tuple[int, int]:
     paths.extend(sorted((ROOT / "infra").rglob("*.md")))
     paths.extend(sorted((ROOT / "contracts").rglob("*.md")))
     paths.extend(sorted((ROOT / "examples").rglob("*.md")))
+    paths.extend(sorted((ROOT / ".github").rglob("*.md")))
     for path in paths:
         content = path.read_text(encoding="utf-8")
         inside = False
@@ -1040,6 +1151,7 @@ def main() -> int:
     errors: list[str] = []
     schema_count, example_count = check_contracts(errors)
     markdown_count, diagram_count = check_markdown(errors)
+    change_request_count = check_change_requests(errors)
     operation_count = check_openapi(errors)
     if errors:
         for problem in errors:
@@ -1048,7 +1160,7 @@ def main() -> int:
     print(
         f"Validated {schema_count} JSON Schemas, {example_count} examples, "
         f"{operation_count} OpenAPI operations, {markdown_count} Markdown files, "
-        f"and {diagram_count} Mermaid fences."
+        f"{diagram_count} Mermaid fences, and {change_request_count} CR/ToDo pairs."
     )
     print("Live OAuth, MCP, OpenShell policies, and Mermaid rendering require integration checks.")
     return 0

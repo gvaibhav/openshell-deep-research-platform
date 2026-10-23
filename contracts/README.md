@@ -4,6 +4,8 @@ These JSON Schemas define the boundary between the dashboard API, controller, sa
 
 The [OpenAPI 3.1 sketch](openapi.yaml) defines the proposed browser-facing, versioned job endpoints. It uses a BFF session cookie after Okta PKCE and a CSRF header for mutations. Internal worker and broker protocols are separate trust boundaries.
 
+The existing job contracts deliberately carry only an opaque source `connection_ref`; they do not expose OAuth grants. Browser-facing source-connection start, callback, status, reauthorization, and disconnect operations are **not yet specified** in OpenAPI. The authenticated API-to-broker start/callback handoff also needs a versioned internal contract: relay one-use code/state with verified session binding, keep PKCE and code exchange in the broker, and return no source token to the API. The [contract change request](../docs/change-requests/CR-0001-source-connection-contract.md) and [paired ToDo](../docs/todos/CR-0001-source-connection-contract.md) require these contracts and same-person source identity denial tests before the first protected connector is built. [Outbound source-token decision](../docs/decisions/0001-outbound-mcp-source-tokens.md).
+
 | Contract | Producer | Consumer | Trust rule |
 | --- | --- | --- | --- |
 | [Job request](job-request.schema.json) | Dashboard | API | Treat every field as untrusted input; no owner, tenant, or arbitrary ACL. |

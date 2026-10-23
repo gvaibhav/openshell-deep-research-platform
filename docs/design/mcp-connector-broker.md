@@ -2,8 +2,10 @@
 
 **Status:** Proposed design; no connector is implemented.  
 **Baseline:** OpenShell v0.1.5, read-only research.  
-**Boundary requirements:** IAM-05, IAM-08, IAM-12, RES-03, CON-11, CON-12.
-**Related:** [architecture](../architecture.md), [identity and access](identity-and-access.md), [requirements](../requirements.md), [contracts](../../contracts/README.md).
+**Boundary requirements:** IAM-05, IAM-08, IAM-12, RES-03, CON-11, CON-12, CON-14–16.
+**Related:** [architecture](../architecture.md), [identity and access](identity-and-access.md), [requirements](../requirements.md), [contracts](../../contracts/README.md), and [actionable impact register](../decisions/0001-outbound-mcp-source-tokens.md#actionable-impact-register).
+
+**Open broker work:** [source identity CR-0002](../change-requests/CR-0002-source-identity-binding.md)/[ToDo](../todos/CR-0002-source-identity-binding.md), [OAuth/MCP adapter CR-0004](../change-requests/CR-0004-oauth-mcp-adapter.md)/[ToDo](../todos/CR-0004-oauth-mcp-adapter.md), and [grant custody CR-0005](../change-requests/CR-0005-grant-custody-revocation.md)/[ToDo](../todos/CR-0005-grant-custody-revocation.md). Conditional Okta and direct-source pairs remain in the impact register.
 
 ## 1. Decision and responsibility
 
@@ -50,7 +52,7 @@ The broker is an authorization boundary. A worker may ask for a smaller time ran
 | Browser to dashboard | Human Okta Authorization Code + PKCE session | Dashboard session store or browser session mechanism | Dashboard API only |
 | Controller to OpenShell | Controller OAuth client credentials | Controller process/secret manager | OpenShell gateway only |
 | Worker to broker | Short-lived job credential or federated workload token | OpenShell provider/proxy and broker verifier | Broker tools for one job/stage/attempt/sandbox and recovery generation |
-| Broker to source | User-delegated source grant, app installation token, GCP workload identity, or provider-specific service grant | Broker/vault | Exact upstream MCP/API resource |
+| Broker to source | User-delegated source grant, app installation token, GCP workload identity, source-approved app grant, or separately qualified Okta OBO/AI Agents token | Broker/vault; an approved Okta AI Agents path may retain an external refresh grant in Okta | Exact upstream MCP/API resource, independent of the broker and gateway audiences |
 | Worker to model gate | Per-attempt model-route credential resolved by an OpenShell provider | OpenShell provider/proxy and trusted model request gate | Exact internal gate endpoint; the gate validates the native model request and owns the upstream provider credential |
 
 **Okta sign-in does not supply source authorization.** An Okta access token for the dashboard must not be forwarded to Slack, GitHub, Google, or an arbitrary MCP server. User delegation needs a separate consent or enterprise authorization path for each source. MCP's HTTP authorization specification requires resource-specific token requests and use of bearer tokens only at the intended MCP resource. [MCP authorization specification](https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization).
@@ -93,7 +95,9 @@ The sequence above illustrates the **prototype fallback**, not an API that OpenS
 
 ## 3. Source connection and consent
 
-The dashboard shows each source's **acting identity** before a user starts a job: personal Slack user, GitHub user, GitHub App installation, or GCP workload principal. An administrator registers allowed source integrations and callback URLs. A researcher can connect an eligible user-delegated source outside the sandbox. The controller stores an opaque `connection_ref`, selected resources, token owner, consent scopes, source audience, status, and refresh/revocation metadata. Raw grants stay in the vault. A source connection is never treated as a blanket approval for every resource reachable by that credential.
+The dashboard shows each source's **acting identity** before a user starts a job: personal Slack user, GitHub user, GitHub App installation, GCP workload principal, or a separately qualified Okta-backed MCP identity. An administrator registers allowed source integrations and callback URLs. A researcher can connect an eligible user-delegated source outside the sandbox. The BFF Connection API owns browser session/CSRF checks and the registered public callback; it relays the one-use code and state to the broker over an authenticated internal channel and receives only an opaque connection reference and display-safe metadata. The broker owns the OAuth transaction, PKCE verifier, code exchange, source identity match, connection record, and token vault; the controller and server-held job policy carry only its opaque `connection_ref`, selected resources, and approved acting-identity snapshot. The record binds tenant, verified dashboard user or approved service principal, source-authenticated principal, consent scopes, source audience, status, and refresh/revocation state. Raw grants stay in the vault. A source connection is never treated as a blanket approval for every resource reachable by that credential.
+
+A one-use `state` and PKCE verifier bind a user source OAuth transaction to the dashboard session, but do **not** prove the person who completed the source login is the dashboard user. The broker stores the transaction's verified dashboard `(iss, sub)`, tenant, and BFF session binding; the BFF rechecks that session at callback, and the broker consumes state and checks the same binding before exchanging the code. The code must not enter logs, browser storage, or job payloads. Before vaulting or using a user grant, the broker validates a stable source user ID through an issuer-approved ID token, UserInfo, introspection, or source-specific authenticated identity endpoint bound to the grant, then compares it through an immutable, issuer-qualified account link approved by Okta or the source owner. The connector must reject a bot/app identity on a user path and prove the identity endpoint used this grant. A dashboard-A/source-B completion, including two users in the same tenant, fails before a connection becomes active; the broker discards its transient token and attempts issuer revocation where supported. Email and a bare `sub` from another issuer are not identity proof. Slack's [auth.test](https://docs.slack.dev/reference/methods/auth.test/) and GitHub's authenticated [user endpoint](https://docs.github.com/en/rest/users/users#get-the-authenticated-user) illustrate source-specific identity APIs. [Source identity requirement](../requirements.md#54-connectors-mcp-and-source-grants).
 
 ```mermaid
 sequenceDiagram
@@ -101,21 +105,41 @@ sequenceDiagram
     actor User
     participant UI as Dashboard
     participant API as Connection API
+    participant Broker as Connector broker
     participant AS as Source authorization server
+    participant Identity as Source identity endpoint
     participant Vault
     participant Catalog as Resource catalog
     User->>UI: Connect a source
     UI->>API: Start connection with verified dashboard session
-    API->>AS: Redirect with registered client, state, PKCE when supported
+    API->>Broker: Authenticated start with user, tenant, and session binding
+    Broker->>Broker: Store one-use state and PKCE verifier
+    Broker-->>API: Authorization URL with state and S256 challenge
+    API-->>User: Redirect to source authorization server
+    User->>AS: Authenticate and consent
     AS-->>API: Authorization callback
-    API->>AS: Exchange code; validate issuer, state, audience and scopes
-    AS-->>API: Source grant and expiry
-    API->>Vault: Encrypt and store grant
-    API->>Catalog: Enumerate approved selectable resources
-    Catalog-->>UI: Acting identity, scope, resource choices
+    API->>API: Verify same live dashboard session
+    API->>Broker: Authenticated relay of code, state, and session binding
+    Broker->>Broker: Consume state; verify user, tenant, session binding
+    Broker->>AS: Exchange code; validate issuer, audience, and scopes
+    AS-->>Broker: Source grant and expiry
+    Broker->>Identity: Validate stable source user with this grant
+    Identity-->>Broker: Issuer-qualified source principal
+    Broker->>Broker: Compare approved immutable account link to dashboard user
+    alt Same verified person
+        Broker->>Vault: Encrypt and store grant
+        Broker->>Catalog: Enumerate approved selectable resources
+        Catalog-->>Broker: Approved resource choices
+        Broker-->>API: Opaque ref and display-safe identity, scopes, choices
+        API-->>UI: Acting identity, scope, resource choices
+    else Different person or unknown link
+        Broker-->>API: Reject; store no grant
+    end
 ```
 
 The broker validates the OAuth metadata and capabilities of each MCP server at registration. A source may require a preregistered confidential client, user consent, an application installation, or a non-OAuth workload exchange. Dynamic Client Registration is optional in the current MCP spec and is unavailable for Slack and GitHub's hosted servers. The source adapter must not assume that one generic client credentials request will work everywhere. [MCP authorization](https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization), [Slack MCP](https://docs.slack.dev/ai/slack-mcp-server), [GitHub host integration](https://github.com/github/github-mcp-server/blob/main/docs/host-integration.md).
+
+For an Okta-protected MCP, choose a separate user Authorization Code + S256 PKCE connection or source-owner-approved app-only Client Credentials according to its ACL. Standard Okta OBO is another **conditional** path: the broker exchanges an eligible custom-server user access token obtained through its separate verified source connection, using a distinct confidential service client; the original subject grant needs renewal or reauthorization during long jobs because the service-app exchange provides no refresh token. Okta for AI Agents STS/XAA is a separate optional entitlement with registered agent/resource connection, consent, custody, and full-grant disconnect behavior. OpenShell's worker-to-broker token is unrelated to all three source flows. [Okta source-flow handoff](../okta/requirements-and-design.md#6-outbound-source-token-choices-and-oktas-conditional-role).
 
 ## 4. Authorize each tool invocation
 
@@ -267,7 +291,7 @@ sequenceDiagram
 | Slack MCP | User-delegated confidential OAuth grant, obtained in dashboard connection flow; later evaluate Enterprise-Managed Authorization (EMA). | Slack's hosted MCP uses a preregistered confidential app and user scopes, with no Dynamic Client Registration. EMA can exchange an IdP-backed user assertion for a short-lived Slack MCP user token when the enterprise enables it. A generic app-only client credentials token is not a substitute for the user's channel permissions. [Slack MCP](https://docs.slack.dev/ai/slack-mcp-server), [Slack EMA](https://docs.slack.dev/authentication/enterprise-managed-authorization/). |
 | GitHub | GitHub App installation token for organization-scoped research, or user OAuth when results must reflect personal access. | Installation tokens are minted from a GitHub App JWT and installation permissions; they are **not** generic OAuth client credentials. The remote MCP server accepts valid access tokens but does not supply OAuth itself or Dynamic Client Registration. Restrict repository set and read permissions in the App and broker. [GitHub host integration](https://github.com/github/github-mcp-server/blob/main/docs/host-integration.md), [GitHub governance](https://github.com/github/github-mcp-server/blob/main/docs/policies-and-governance.md). |
 | GCP Logging | Broker read-only wrapper around Cloud Logging API using GCP Workload Identity Federation or GKE Workload Identity; evaluate hosted Logging MCP separately. | Google recommends keyless workload federation. Its Logging MCP example currently asks for `roles/mcp.toolUser` and `roles/logging.admin`, which is broader than a read-only research service should assume. Test a custom read-only role/deny policy; otherwise use the Logging API with `roles/logging.viewer` or a narrower log-view grant. [Google WIF](https://docs.cloud.google.com/iam/docs/workload-identity-federation), [Logging MCP](https://docs.cloud.google.com/logging/docs/use-logging-mcp), [Logging IAM](https://docs.cloud.google.com/logging/docs/access-control). |
-| Custom OAuth MCP | Registered per-server adapter with protected-resource metadata, audience, scopes, client registration method, and read tool schemas. | MCP requires a `resource` parameter in authorization and token requests, and the token must be intended for that MCP resource. Validate the actual server and issuer behavior, including refresh and 401 recovery. [MCP authorization](https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization). |
+| Custom OAuth MCP | Registered per-server adapter with protected-resource metadata, canonical MCP `resource`, audience or source-verified binding, scopes, acting principal, client registration method, and read tool schemas. | A direct Authorization Code flow sends `resource` in both authorization and token requests; a machine or OBO flow must prove its MCP-token request accepts the canonical `resource`. The OBO subject authorization has a separate audience. Validate the actual grant, server, issuer, refresh, 401 recovery, and same-person link for a user grant. [MCP authorization](https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization), [Okta handoff](../okta/requirements-and-design.md#6-outbound-source-token-choices-and-oktas-conditional-role). |
 
 ```mermaid
 sequenceDiagram
@@ -301,11 +325,14 @@ sequenceDiagram
 
 OpenShell v0.1.5 supports gateway-managed `oauth2_client_credentials` provider refresh, using a stored client ID/secret and a profile-owned token URL. It also supports dynamic `token_grant: client_credentials` using a SPIFFE JWT-SVID client assertion, where the issuer accepts that assertion. These are useful for a service endpoint that accepts the resulting token and can enforce the required scope. Neither mechanism grants the identity of a dashboard user. The generic provider refresh documentation does not establish support for every upstream MCP server's RFC 8707 `resource` parameter; an integration test must prove token audience and handshake. [OpenShell provider profiles, v0.1.5](https://docs.nvidia.com/openshell/v0.1.5/how-it-works/providers/profiles), [MCP authorization](https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization).
 
+Its documented SPIFFE-backed `token_grant: token_exchange` is also **not** standard Okta OBO or Okta for AI Agents STS/XAA: it uses a stored current CLI OIDC access token that OpenShell does not refresh in the profile, and the documented grant fields do not establish MCP `resource` wire compatibility. The broker's outbound token exchange occurs outside the OpenShell supervisor. [OpenShell provider profiles](https://docs.nvidia.com/openshell/v0.1.5/how-it-works/providers/profiles).
+
 ## 6. Direct MCP bypass of the broker
 
 Direct sandbox-to-upstream MCP is an optimization, not the default. It is permitted only after a connector review proves **all** conditions below. In the broker path, an OpenShell-injected worker token authenticates the worker **to this broker**; the broker obtains a distinct source token **for the vendor**. Direct mode may let OpenShell supply a source token to an upstream MCP endpoint only when that source's native RBAC already enforces the exact stage partition and evidence capture is equivalent:
 
 - The upstream credential is a dedicated, short-lived, least-privilege identity whose native authorization already limits the exact job-stage partition, connection, and resources. No broker-side argument filter is needed. Each private retrieval sandbox has only this source endpoint; synthesis has none.
+- A user-delegated direct grant passes the same immutable, issuer-qualified dashboard/source-person match required by CON-14 **before** any provider credential or refresh configuration is created. Its source-specific identity proof remains bound to the grant and exact job/attempt lineage. An app-only grant instead needs source-owner approval for the shared corpus and native service permissions; it cannot inherit an employee's private ACL.
 - The issuer/upstream **must sender-bind the raw vendor token to the original immutable sandbox and attempt** and deny a copied token presented from another origin. A gateway attachment interceptor cannot stop replay of a bearer sent directly to the vendor. Separately, issuer grant policy or a qualified fail-closed gateway interceptor must deny reuse or minting of that source grant in a second sandbox, **including another attempt of the same job**, by a controller holding workspace `sandbox:write`. The signed admission and attachment guard bind the exact per-attempt provider instance ID/name, immutable profile digest, and approved credential/grant generation; a different instance with the same profile cannot substitute. Per-job workspaces narrow exposure but do not prevent same-job attempt reuse. Both upstream sender denial and second-sandbox grant denial need live proof before direct mode is enabled. [OpenShell workspace roles](https://docs.nvidia.com/openshell/v0.1.5/how-it-works/workspaces).
 - From `CreateSandbox` until the immutable sandbox ID/attempt registration, effective-policy and provider receipt, current recovery generation, and manifest readiness are committed, an independent source-egress **and token-mint** barrier denies direct calls. The barrier covers the real supervisor/provider-originated route and a broad Workspace User `exec` during bootstrap; a timed-out or uncertain create remains closed until reconciliation. A worker manifest alone cannot fence a process that starts before admission completes.
 - An attached direct source provider is externally immutable for its attempt: the fail-closed interceptor denies **every** `UpdateProvider` and `ConfigureProviderRefresh` call against it, including a same-profile broader token or refresh configuration from a valid provisioner `provider:write` token. OpenShell's interceptor omits secret fields and the provider layer does not extract token scopes, so it cannot safely approve a value change by inspecting the RPC. Only gateway-managed automatic short-lived refresh under the pinned pre-attachment configuration is eligible, and the issuer/upstream must independently prove unchanged sandbox/attempt grant lineage and exact source resource scope. If that proof fails, disable direct mode; a scope or grant change needs deletion and a fresh admitted attempt. [Gateway interceptor secret limits](https://docs.nvidia.com/openshell/v0.1.5/extensibility/gateway-interceptors), [provider scope limitation](https://docs.nvidia.com/openshell/v0.1.5/how-it-works/providers/profiles).
@@ -391,7 +418,10 @@ Each adapter gets a positive and negative test suite before production:
 | Gate | Required proof |
 | --- | --- |
 | Identity | Correct acting user or app principal, wrong-tenant and wrong-job denial, token audience isolation. |
+| User source connection | Verify a stable source user ID from a grant-bound claim or authenticated identity endpoint and the immutable issuer-qualified dashboard account link **before** vaulting. A dashboard-A/source-B authorization with valid state/PKCE, same tenant, or matching email, an app/bot identity, or callback replay denies; only a proven same-person connection becomes active. For direct user grants, make the same check before provider material is created. |
 | OAuth | Real discovery/registration path, consent or service grant, resource parameter where applicable, refresh, rotation, 401/403 handling, revocation. |
+| Conditional Okta standard OBO | A separate broker service client exchanges a renewable eligible custom-AS user access token for the exact MCP target. Wrong subject type/issuer/user, actor client, `resource`, audience, or scope denies; unavailable `act` requires explicit proof that source policy works without it and source-owner/security approval of broker actor audit. No refresh token emerges from the service-app exchange; an expired original subject pauses or denies a long job. |
+| Conditional Okta for AI Agents | A registered agent/resource connection handles consent or approved machine delegation, `interaction_required`, target binding, and source-owner disconnect. A dashboard-client ID token or another user's grant denies; revoking only the short-lived STS token does not count as full source-grant revocation. |
 | Scope | Out-of-scope channel/repo/project/log view and wildcard/filter injection denied before upstream call. Every returned item also carries source-authenticated canonical identity matching the selected tenant/installation, resource/ref, and time scope before evidence capture or worker release. A mixed in-scope/out-of-scope page or an item with missing/conflicting/ambiguous resource identity releases **zero** page fields or evidence IDs; an adapter may explicitly re-fetch and verify one exact item in a separate operation. A text-only MCP result without verifiable item identity cannot qualify the tool. |
 | Pagination scope | Search an allowed Slack channel and receive a broker handle for a second page. The same attempt continues with the unchanged channel/query/time and a valid grant; the second page is scoped and bounded. Supply a raw upstream cursor, tamper with the handle, replay it from another job/attempt/connection, or use it after a policy/grant/recovery-generation change: all deny before source I/O. Try a handle from channel A with channel B, broader time, or different query; no upstream request occurs. An adapter whose upstream cursor can change scope without reasserting the original filter is not enabled for pagination. |
 | Data flow | Two source partitions cannot share a retrieval sandbox or private checkpoint. A source A fixture marker cannot reach source B as a query without a current reviewed typed-key transfer; forged labels and guessed same-job evidence IDs are denied. Synthesis has no source route. |

@@ -21,6 +21,39 @@ For an AI-agent handoff, state the outcome, requirement IDs, data class, affecte
 
 Use **short, end-to-end slices with risk-based gates**. Once executable code exists, use short-lived branches, a protected main branch, automated pull-request checks, and promotion of the **same immutable build** through environments. Keep a working public/synthetic path while adding one enterprise connector at a time. Treat NIST's [Secure Software Development Framework](https://csrc.nist.gov/pubs/sp/800/218/final) as a secure-development reference, and evaluate research behavior with curated offline cases plus production monitoring as described in [LangChain evaluation guidance](https://docs.langchain.com/langsmith/evaluation-types).
 
+### Design-change impact gate
+
+Apply this workflow to **every change in intended behavior or design** during initial development and later enhancements, including identity, protocol, data, deployment, policy, and operational decisions. Complete the impact analysis and create its tracking records **in the design change**, before an implementation pull request starts. An ADR records a decision; a change request (CR) records an obligation to make the design real; its paired ToDo records the work and proof. Documentation alone never means a component is implemented. [ADR 0002](docs/decisions/0002-design-impact-traceability.md) records this workflow decision and its own open process-control pair.
+
+1. **Analyze the change.** In the primary affected design or an ADR, name the decision, requirement IDs, trust/data boundaries, assumptions, accepted and denied behavior, and a threat-model delta where relevant. Sweep every surface below. Mark each **affected** with its concrete impact, impact ID, and revised-document link; for an artifact that does not yet exist, name its planned path and pre-implementation gate. Mark each **not affected** with a reason. An affected surface must map to at least one tracked impact; an omitted surface is not a decision. A surface is a place changed by an impact, not necessarily a separate impact itself.
+2. **Create a pair for every identified impact.** An impact is one independently deliverable or verifiable change in a component, contract, configuration, operational control, proof gate, or documentation; it may span several surfaces and files. Give it one stable `CR-NNNN` ID, a `docs/change-requests/CR-NNNN-<slug>.md` change request, and a same-basename `docs/todos/CR-NNNN-<slug>.md` ToDo. The CR states current versus target behavior, owner, phase, requirement IDs, affected paths, dependencies, risk/disable path, and positive and negative acceptance. The paired ToDo lists executable tasks, required tests and evidence, implementation PRs, and status. Map every impact ID in the analysis to exactly one pair; do not leave a vague future-work note or create a separate CR for each edited file. Keep conditional options `Deferred` until selected or explicitly withdrawn. Before implementing an existing design slice with no pair, create one from its current primary design and requirement IDs, identify that the intended behavior is unchanged, and add the backlinks in step 3; no new ADR is needed unless the design changes.
+3. **Synchronize and link.** Revise every affected **existing** normative architecture, requirements, design, Okta handoff, contract, example, and component guide in the **same design change**. A CR or ToDo cannot stand in for a stale document. A new contract or fixture that cannot be specified until a source is chosen must have a named CR/ToDo and a pre-implementation gate; write it before dependent component code. Link each CR **and** its paired ToDo directly from the impact analysis, the affected primary design, [README.md](README.md), and the [ToDo index](docs/TODO.md). The index is a register, not a second copy of task details. The design and README must make open component obligations visible beside the intended behavior.
+4. **Implement and reconcile.** Each implementation pull request cites its CR/ToDo pair and requirement IDs, changes the named component or configuration, and records allow and deny evidence on pinned versions. Recheck architecture, design, contracts, and application behavior together when implementation reveals a difference; rerun this impact workflow for a changed target design. Use matching `Open`, `In progress`, `Deferred`, `Verified`, or `Withdrawn` status in both records. Mark a pair `Verified` only after its required change and proof pass and the design matches the as-built behavior. Reconcile the README and index descriptions, and retain their links for audit after closure. A documentation-only impact can close after document review and checks; a checked box or documentation edit alone cannot close an implementation CR. `Withdrawn` needs a recorded decision and removal of the abandoned behavior from the intended design.
+
+| Surface to check | Impact record must identify |
+|---|---|
+| README and numbered requirements | Changed user promise, scope, phase, requirement IDs, acceptance criteria, or repository navigation |
+| Architecture and affected design handoffs | Changed component responsibility, token/data flow, sequence, deployment topology, or team-facing design, including the Okta handoff where relevant |
+| OpenAPI, JSON Schema, and other contracts | Changed API, event, policy, identity, error, or persistence shape and compatibility plan |
+| Examples and fixtures | Changed valid and denied examples, sample claims, manifests, or research cases |
+| Component documentation, code, and configuration | Changed dashboard, API, controller, broker, worker, OpenShell, identity, or source integration behavior |
+| Deployment, operations, and security controls | Changed secret custody, routing, audit, recovery, migration, revocation, rollout, or disable path |
+| Tests, evaluations, and release gates | New or changed positive and negative proof, version pin, source-owner/Okta review, or live qualification |
+
+```mermaid
+flowchart LR
+    Design[Proposed design change] --> Impact[Analyze all affected surfaces]
+    Impact --> Pair[One CR and ToDo per impact]
+    Pair --> Sync[Revise affected documents and link README]
+    Sync --> Build[Implement component or configuration]
+    Build --> Proof{Allow and deny evidence passes?}
+    Proof -->|No| Open[Keep pair open and reconcile design]
+    Open --> Impact
+    Proof -->|Yes| Verified[Verify as-built design and close pair]
+```
+
+The gate is complete for a **design change** when every affected matrix row maps to a paired impact, the required CR/ToDo pairs and same-change document revisions are present, and links plus applicable design checks/reviews pass. Component CRs remain open until implementation proof passes. Highlight open component changes and pair links in the chat handoff and pull request. `make check` validates pair/link structure; design review checks whether the listed impacts and application behavior are complete. A design-only check is not live conformance proof.
+
 ### Initial development: retire unknowns before scaling the build
 
 ```mermaid
@@ -50,15 +83,15 @@ Do not use the first public-source success as proof that private connector auth,
 ### Loop for every implementation slice
 
 1. Write the intended user outcome, requirement IDs, data class, affected trust boundaries, measurable acceptance criteria, **denial cases**, and rollback or disable path. For agent behavior, identify the evaluation cases before tuning the prompt or model.
-2. Update the relevant design and OpenAPI/JSON Schema contract **when the boundary or payload changes**. Keep example payloads valid. Record a threat-model delta for identity, source, sandbox, egress, result visibility, or data-retention changes.
+2. Apply the [design-change impact gate](#design-change-impact-gate) whenever the intended design changes. Record the impact analysis, create or revise one CR and paired ToDo for every identified impact, and link both from the design and README before implementation. Update all impacted documents and OpenAPI/JSON Schema contracts in the same change, keep examples valid, and record a threat-model delta for identity, source, sandbox, egress, result visibility, or data retention.
 3. Implement the smallest end-to-end behavior with deterministic fixtures first. Put authorization in the API/broker, not in prompts or disabled UI controls. Add meaningful unit and component tests for policy decisions, failure and retry semantics, and evidence integrity. Avoid tests that merely repeat an implementation line.
 4. Run local/static checks, then relevant staged integration on the exact pinned versions. A live authorization or network claim needs a live negative test. For a connector, prove MCP discovery, resource indicator, audience validation, refresh/revocation, read-only scope, and argument-level denial. [MCP authorization specification](https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization).
-5. Open a small pull request with requirement IDs, contract/policy diff, positive and negative evidence, evaluation delta where relevant, observed limitations, and deployment/rollback notes. For a material cross-component or trust-boundary change, give the full diff and evidence to a separate read-only agent using the [principal engineer review skill](.agents/skills/principal-engineer-review/SKILL.md); resolve Blockers before merge and record other finding dispositions. Get a domain review when the change affects Okta, a source's permissions, OpenShell policy, or data governance.
+5. Open a small pull request using the [review template](.github/pull_request_template.md) with requirement IDs, the impact analysis and every open CR/ToDo pair, contract/policy diff, positive and negative evidence, evaluation delta where relevant, observed limitations, and deployment/rollback notes. Reconcile the pair status and architecture/design with the component diff; highlight still-open component work in the chat handoff. For a material cross-component or trust-boundary change, give the full diff and evidence to a separate read-only agent using the [principal engineer review skill](.agents/skills/principal-engineer-review/SKILL.md); resolve Blockers before merge and record other finding dispositions. Get a domain review when the change affects Okta, a source's permissions, OpenShell policy, or data governance.
 6. Promote the tested immutable artifact through staging and an authorized canary. Watch audit denials, group/source revocation, citation quality, token/tool failures, latency, cost, and sandbox cleanup. Disable or roll back if a release threshold is crossed; add any escaped failure to regression cases.
 
 ## Verification and release evidence
 
-**Current repository check:** `make check` validates JSON Schemas, examples, local Markdown links, and Mermaid fence structure. It does **not** render diagrams or prove OAuth, MCP, OpenShell policy, CNI, or runtime behavior. There is currently no CI pipeline or executable service suite. Add those gates as their components are implemented; report exactly which checks actually ran.
+**Current repository check:** `make check` validates JSON Schemas, examples, local Markdown links, CR/ToDo pairing and backlinks, and Mermaid fence structure. It does **not** render diagrams, determine whether an impact was omitted, or prove OAuth, MCP, OpenShell policy, CNI, or runtime behavior. There is currently no CI pipeline or executable service suite. Add those gates as their components are implemented; report exactly which checks actually ran.
 
 The intended layered checks are:
 
@@ -78,12 +111,13 @@ Implement **OPS-10** with the first executable build. This design-only repositor
 
 ## Enhancements after the first release
 
-Initial development proves that the product and trust boundaries work at all. An enhancement starts from a **measured gap or incident** and tests the changed behavior plus the invariants it could disturb. It does not repeat the full build-versus-buy pilot for a routine fix. Revisit feasibility when a platform, source, model, or enterprise policy change undermines the original build decision.
+Initial development proves that the product and trust boundaries work at all. An enhancement starts from a **measured gap or incident** and tests the changed behavior plus the invariants it could disturb. Every enhancement that changes intended design repeats the [design-change impact gate](#design-change-impact-gate), revises affected documents in that change, and creates or updates the CR/ToDo pair for **every** identified impact. It does not repeat the full build-versus-buy pilot for a routine fix. Revisit feasibility when a platform, source, model, or enterprise policy change undermines the original build decision.
 
 ```mermaid
 flowchart LR
-    Signal[User need, incident, or metric] --> Impact[Map data, contract, policy, and runtime impact]
-    Impact --> Design[Update design and acceptance cases]
+    Signal[User need, incident, or metric] --> Impact[Record affected and unaffected surfaces]
+    Impact --> Pair[Create or revise CR and ToDo per impact]
+    Pair --> Design[Revise design, requirements, contracts, and guides]
     Design --> Verify[Targeted CI, evaluation, and live boundary tests]
     Verify --> Canary[Flagged or limited canary]
     Canary --> Observe{Quality and security gates pass?}
