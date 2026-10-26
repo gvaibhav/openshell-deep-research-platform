@@ -31,6 +31,10 @@ flowchart LR
     Controller --> Dashboard
 ```
 
+## Build plan and inputs
+
+The [proposed implementation plan](docs/design/implementation-plan.md) starts with a bounded full-graph OpenShell spike and a matched ChatGPT Enterprise/restricted-worker comparison. The SEL-01/02/04/05 decision comes **before** the dashboard/control-plane build; a measured gap then unlocks the fixture-backed public slice, live Okta integration, sources, and deployment gates. Copy the tracked [`.env.example`](.env.example) to the ignored `.env` and fill only the section needed for the current milestone. No external credentials are needed to start coding the synthetic spike harness; raw secrets belong in an approved secret manager or ignored local secret files, never in `.env`. [OPS-13](docs/requirements.md#55-operations-and-governance) requires fixture providers to be absent from signed release images and network-accessible deployments. The input/configuration work is tracked by [CR-0010](docs/change-requests/CR-0010-build-configuration-contract.md) and its [ToDo](docs/todos/CR-0010-build-configuration-contract.md). No application code reads the template yet.
+
 ## Platform comparison and potential edge
 
 This is an **internal build-versus-buy decision** for a design-stage service. The table summarizes published capabilities as of 2026-10-23; tenant entitlements, connector permissions, and the proposed advantages need a matched pilot. See the [full feasibility and market assessment](docs/feasibility-and-market-assessment.md) for sources, qualification gates, and the decision method.
@@ -83,6 +87,7 @@ The [source-authentication impact analysis](docs/decisions/0001-outbound-mcp-sou
 | DR-AUTH-007 | Conditional Okta for AI Agents | [CR-0007](docs/change-requests/CR-0007-okta-ai-agents.md) | [ToDo](docs/todos/CR-0007-okta-ai-agents.md) |
 | DR-AUTH-008 | Conditional direct OpenShell source access | [CR-0008](docs/change-requests/CR-0008-direct-openshell-source.md) | [ToDo](docs/todos/CR-0008-direct-openshell-source.md) |
 | DR-PROC-001 | Design impact and implementation traceability; protected CI remains open | [CR-0009](docs/change-requests/CR-0009-design-impact-traceability.md) | [ToDo](docs/todos/CR-0009-design-impact-traceability.md) |
+| DR-BUILD-001 | Safe build inputs, profile validation, and development-artifact exclusion | [CR-0010](docs/change-requests/CR-0010-build-configuration-contract.md) | [ToDo](docs/todos/CR-0010-build-configuration-contract.md) |
 
 ## Repository map
 
@@ -92,6 +97,7 @@ The [source-authentication impact analysis](docs/decisions/0001-outbound-mcp-sou
 | [.github/pull_request_template.md](.github/pull_request_template.md) | Review checklist for design impact, document revisions, deferred component work, and proof. |
 | [docs/decisions/0001-outbound-mcp-source-tokens.md](docs/decisions/0001-outbound-mcp-source-tokens.md) | Impact analysis and decision record for brokered outbound MCP source tokens and optional Okta flows. |
 | [docs/decisions/0002-design-impact-traceability.md](docs/decisions/0002-design-impact-traceability.md) | Decision and impact analysis for per-impact CR/ToDo traceability and implementation closure. |
+| [docs/design/implementation-plan.md](docs/design/implementation-plan.md) and [.env.example](.env.example) | Proposed build sequence and nonsecret input worksheet. |
 | [docs/TODO.md](docs/TODO.md) | Index of per-impact CR/ToDo pairs; each pair carries its own work and status. |
 | [docs/change-requests/](docs/change-requests/) and [docs/todos/](docs/todos/) | Change obligations and paired implementation checklists with evidence and closure gates. |
 | [docs/agent-skills.md](docs/agent-skills.md) | Focused repository-local agent skills and NVIDIA OpenShell reuse guidance. |

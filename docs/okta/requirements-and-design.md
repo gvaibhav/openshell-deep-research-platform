@@ -367,6 +367,7 @@ OKTA_DASHBOARD_CLIENT_ID={dashboardWebClientId}
 OKTA_DASHBOARD_CLIENT_AUTH=client_secret_basic
 OKTA_DASHBOARD_CLIENT_SECRET_REF={secretManagerReference}
 OKTA_DASHBOARD_REDIRECT_URI=https://research.example.com/auth/okta/callback
+OKTA_DASHBOARD_LOGOUT_REDIRECT_URI=https://research.example.com/
 OKTA_DASHBOARD_SCOPES=openid profile email groups
 ```
 

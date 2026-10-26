@@ -2,7 +2,7 @@
 
 This is the discovery index for design impacts. Each impact has a change request (CR) describing the required change and a paired ToDo containing executable tasks and evidence. The CR and ToDo carry the current matching **Status**; this index does not duplicate their acceptance criteria or status. The [design-change workflow](../AGENTS.md#design-change-impact-gate) requires a pair for every identified impact and direct links from the affected design and README. Keep pairs linked here after closure for audit.
 
-The current source-authentication impacts come from [ADR 0001 and its impact analysis](decisions/0001-outbound-mcp-source-tokens.md#impact-analysis-and-document-disposition); the workflow impact comes from [ADR 0002](decisions/0002-design-impact-traceability.md#impact-analysis). The repository is still a design scaffold, so open and deferred component pairs below are obligations, not running controls.
+The current source-authentication impacts come from [ADR 0001 and its impact analysis](decisions/0001-outbound-mcp-source-tokens.md#impact-analysis-and-document-disposition); the workflow impact comes from [ADR 0002](decisions/0002-design-impact-traceability.md#impact-analysis); the build-input impact comes from the [implementation plan](design/implementation-plan.md#5-impact-analysis-for-this-planning-change). The repository is still a design scaffold, so open and deferred component pairs below are obligations, not running controls.
 
 | Impact | Implementable obligation | Change request | Paired ToDo | Phase or decision |
 |---|---|---|---|---|
@@ -15,5 +15,6 @@ The current source-authentication impacts come from [ADR 0001 and its impact ana
 | DR-AUTH-007 | Qualify Okta for AI Agents STS/XAA | [CR-0007](change-requests/CR-0007-okta-ai-agents.md) | [ToDo](todos/CR-0007-okta-ai-agents.md) | Conditional source decision |
 | DR-AUTH-008 | Qualify one direct OpenShell source connector | [CR-0008](change-requests/CR-0008-direct-openshell-source.md) | [ToDo](todos/CR-0008-direct-openshell-source.md) | Conditional Phase 2 |
 | DR-PROC-001 | Enforce impact-to-implementation traceability and protected CI | [CR-0009](change-requests/CR-0009-design-impact-traceability.md) | [ToDo](todos/CR-0009-design-impact-traceability.md) | Local workflow now; CI before executable build |
+| DR-BUILD-001 | Validate build profiles, external references, and development-artifact exclusion | [CR-0010](change-requests/CR-0010-build-configuration-contract.md) | [ToDo](todos/CR-0010-build-configuration-contract.md) | Milestone 2 after selection; live deployment guard before deployment |
 
 A pair becomes **Verified** only when its required change and proof are recorded in both files and the design is reconciled. For an implementation impact, that means the named component or configuration change plus positive and negative evidence on pinned versions; documentation-only impacts need document review and checks. A deferred option stays visible until selected or explicitly **Withdrawn** with a decision that updates the intended design. Every implementation pull request links its pair and reports any new impact back into the analysis.
