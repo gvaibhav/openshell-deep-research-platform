@@ -40,3 +40,18 @@ The [writer-local review](../evidence/CR-0011-linux-publication-fd-review-2026-1
 ## Successful reviewed implementation run
 
 [Run 40457656193](https://github.com/gvaibhav/openshell-deep-research-platform/actions/runs/40457656193) passed all four required PR jobs on `3ddc17a479eb01433ecf6c371d78025e187622fe`, including the writer fix and isolated CR-0022 slice. Local checks passed 428 tests with Python 3.13.17; the expanded content and complete PR patch/history secret rescans found zero findings. This is observed **unprotected PR CI**, not branch protection, final-image qualification, or release approval. Repository owners still need the enforcement and failure-blocking proof above. The following documentation-only commit records this result without changing the reviewed implementation.
+
+## Caller-custody follow-up
+
+Reviewed correction `1e256523822b6cc627a1317f28026290c1ebd9d7` retains map/unblind/packet/manifest handles through caller validation and rollback, checks final packet identities, and closes handles after cleanup. [Red-first evidence](../evidence/CR-0011-caller-file-lifetime-tdd-2026-10-26.md) and [independent review](../evidence/CR-0011-caller-file-lifetime-independent-review-2026-10-26.md) record the tested scope and remaining same-UID custody limits. All 435 local tests passed, and the final 285-file content plus full PR history/pending patch secret scan had zero findings after synthetic-canary rejection.
+
+[Run 40459074919](https://github.com/gvaibhav/openshell-deep-research-platform/actions/runs/40459074919) passed on that exact implementation commit:
+
+| Check | Result |
+|---|---|
+| [contracts, lint, types, tests](https://github.com/gvaibhav/openshell-deep-research-platform/actions/runs/40459074919/job/122039136051) | Passed |
+| [secret scan](https://github.com/gvaibhav/openshell-deep-research-platform/actions/runs/40459074919/job/122039136101) | Passed |
+| [exact lock CVEs and KEV](https://github.com/gvaibhav/openshell-deep-research-platform/actions/runs/40459074919/job/122039135734) | Passed |
+| [deployment misconfiguration scan](https://github.com/gvaibhav/openshell-deep-research-platform/actions/runs/40459074919/job/122039135996) | Passed |
+
+The PR remains draft. No branch protection, distribution, enterprise-source, release-promotion, or full dashboard gate was enabled. CR-0009/0011/0013 remain open or in progress as recorded; CI success is not protected enforcement or release qualification.
