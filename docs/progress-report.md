@@ -372,6 +372,12 @@ The [complete CR/ToDo index](TODO.md) includes deferred source paths and later e
 
 | 2026-10-26 | Independent checkpoint portability review returned | `/root/checkpoint_review` and root agent | Reviewer found no scoped Blocker/Important, independently passed the five affected tests, and observed canonical `/private/tmp` owned by UID 0 with mode 01777. Root passed all 72 binding tests plus lint/format. Relative evidence links preserve historical content; Linux proof awaits CI on the committed correction. No production policy changed. |
 
+| 2026-10-26 | CR-0022 red-first phase reported | `/root/cost_export_scope` | Before implementation, the new 21-method synthetic test module exited 1 with missing `eval.cost_export`. Cases cover unknown versus zero, decimal full-matrix accounting, six export states, artifact integrity, exact corroboration/run/object bindings, mutation, bounds, and timestamps. Helper/schema implementation now begins; current signed scorer and external gates remain unchanged. |
+
+| 2026-10-26 | Linux signing-fixture portability correction and review assigned | Root agent and `/root/checkpoint_review` | Completed [run 40456884814](https://github.com/gvaibhav/openshell-deep-research-platform/actions/runs/40456884814) exposed 7 failures/22 errors from Mac temp paths and the deliberately Mac-qualified verifier digest. Tests now pin the runner’s absolute root-controlled `/usr/bin/openssl` only inside cleanup-scoped test contexts and retain changed-digest/invalid-signature denials. Application pin and signature checks are unchanged; this does not qualify a Linux observed-run verifier. Focused tests and independent recheck are running. |
+
+| 2026-10-26 | Signing-fixture portability re-review returned | `/root/checkpoint_review` and root agent | Reviewer independently passed five valid/invalid signature/digest/fake-verifier cases and confirmed original application pin restoration after cleanup, with no scoped Blocker/Important. Root passed 128 signing-related tests plus lint/format on Python 3.13.17. Captured synthetic key generation omits unsupported LibreSSL `-quiet`; production verification remains unchanged. Fresh Linux CI is pending. |
+
 ## Next update rule
 
 Record an entry here and send a short chat update whenever a task is assigned to a sub-agent, a sub-agent returns, or an independent reviewer begins or returns. Record red/green TDD evidence and unrun live gates against the owning ToDo before marking a CR verified.

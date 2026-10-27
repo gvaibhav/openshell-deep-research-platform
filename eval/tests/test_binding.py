@@ -28,7 +28,7 @@ from eval.scorecard import EvaluationError, build_scorecard, canonical_digest, m
 from eval.tests.test_scorecard import fixture_inputs
 
 ROOT = Path(__file__).resolve().parents[1]
-OPENSSL = Path(shutil.which("openssl") or "/usr/bin/openssl")
+OPENSSL = Path("/usr/bin/openssl")
 SYSTEM_TMP = Path("/tmp").resolve(strict=True)
 
 
@@ -221,7 +221,6 @@ class SignedFixture:
             [
                 str(OPENSSL),
                 "genpkey",
-                "-quiet",
                 "-algorithm",
                 "RSA",
                 "-pkeyopt",
@@ -531,6 +530,12 @@ class SignedFixture:
 @unittest.skipUnless(OPENSSL.is_file(), "qualified verifier is unavailable")
 class SignedBindingTests(unittest.TestCase):
     def setUp(self) -> None:
+        # Test-only pin: exercise real signatures without qualifying another runtime.
+        self.enterContext(
+            patch.object(
+                blind_tool_module, "TRUSTED_VERIFIER_SHA256", file_hash(OPENSSL)
+            )
+        )
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.fixture = SignedFixture(Path(self.temporary.name))

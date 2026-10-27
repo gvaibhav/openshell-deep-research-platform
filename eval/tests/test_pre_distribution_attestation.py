@@ -14,9 +14,11 @@ import tempfile
 import unittest
 from pathlib import Path
 from typing import Any, ClassVar
+from unittest.mock import patch
 
 from jsonschema import Draft202012Validator, ValidationError
 
+from eval.blind_review import tool as blind_tool_module
 from eval.pre_distribution_attestation import (
     PreDistributionAttestationError,
     verify_pre_distribution_attestation,
@@ -70,6 +72,14 @@ class PreDistributionAttestationTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
+        # Test-only pin; the application verifier remains separately qualified.
+        cls.enterClassContext(
+            patch.object(
+                blind_tool_module,
+                "TRUSTED_VERIFIER_SHA256",
+                digest(OPENSSL.read_bytes()),
+            )
+        )
         cls.key_directory = tempfile.TemporaryDirectory(prefix="synthetic-pre-attest-")
         cls.addClassCleanup(cls.key_directory.cleanup)
         directory = Path(cls.key_directory.name)

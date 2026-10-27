@@ -6,7 +6,6 @@ import copy
 import hashlib
 import json
 import os
-import shutil
 import stat
 import subprocess
 import sys
@@ -20,7 +19,7 @@ from eval.blind_review import tool as blind_tool_module
 from eval.blind_review.tool import BlindReviewError, prepare_packets, verify_and_unblind
 
 EVAL_ROOT = Path(__file__).resolve().parents[2]
-OPENSSL_BIN = shutil.which("openssl")
+OPENSSL_BIN = "/usr/bin/openssl" if Path("/usr/bin/openssl").is_file() else None
 
 
 def digest(value: object) -> str:
@@ -48,6 +47,14 @@ def save(path: Path, value: object) -> None:
 
 class BlindReviewTests(unittest.TestCase):
     def setUp(self) -> None:
+        # Test-only pin: ownership, real signature checks and digest denial still run.
+        self.enterContext(
+            patch.object(
+                blind_tool_module,
+                "TRUSTED_VERIFIER_SHA256",
+                file_hash(Path("/usr/bin/openssl")),
+            )
+        )
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name).resolve(strict=True)
@@ -206,7 +213,6 @@ class BlindReviewTests(unittest.TestCase):
             [
                 OPENSSL_BIN,
                 "genpkey",
-                "-quiet",
                 "-algorithm",
                 "RSA",
                 "-pkeyopt",
@@ -1090,6 +1096,14 @@ class BlindReviewTests(unittest.TestCase):
         with self.assertRaises(BlindReviewError):
             self._unblind(key_hash)
         self.assertFalse(self.unblinded_path.exists())
+
+    @unittest.skipUnless(OPENSSL_BIN, "OpenSSL is required for signed witness test")
+    def test_changed_verifier_digest_fails_closed(self) -> None:
+        with (
+            patch.object(blind_tool_module, "TRUSTED_VERIFIER_SHA256", "0" * 64),
+            self.assertRaisesRegex(BlindReviewError, "trusted verifier digest changed"),
+        ):
+            blind_tool_module._trusted_verifier_path()
 
     @unittest.skipUnless(OPENSSL_BIN, "OpenSSL is required for signed witness test")
     def test_caller_supplied_fake_verifier_cannot_unblind_invalid_signature(
