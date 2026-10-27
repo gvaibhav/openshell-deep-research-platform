@@ -1818,6 +1818,7 @@ def _write_new_output(
     temporary_created = False
     published = False
     created_identity: tuple[int, int] | None = None
+    temporary_fd: int | None = None
     try:
         temporary_fd = os.open(
             temporary_name,
@@ -1826,17 +1827,16 @@ def _write_new_output(
             dir_fd=directory_fd,
         )
         temporary_created = True
-        try:
-            created_identity = _directory_identity(temporary_fd)
-            with os.fdopen(temporary_fd, "wb", closefd=False) as handle:
-                os.fchmod(handle.fileno(), 0o600)
-                handle.write(
-                    rendered.encode("utf-8") if isinstance(rendered, str) else rendered
-                )
-                handle.flush()
-                os.fsync(handle.fileno())
-        finally:
-            os.close(temporary_fd)
+        # Keep this inode alive through publication and cleanup. Closing early
+        # permits an unlinked replacement to reuse the same device/inode pair.
+        created_identity = _directory_identity(temporary_fd)
+        with os.fdopen(temporary_fd, "wb", closefd=False) as handle:
+            os.fchmod(handle.fileno(), 0o600)
+            handle.write(
+                rendered.encode("utf-8") if isinstance(rendered, str) else rendered
+            )
+            handle.flush()
+            os.fsync(handle.fileno())
         _assert_output_target(target, parent_was_written=True)
         # This temporary file changes the shared parent directory timestamp.
         _assert_output_catalog(binding_catalog, allow_parent_write=True)
@@ -1887,8 +1887,12 @@ def _write_new_output(
             raise
         raise EvaluationError("scorecard output could not be published") from exc
     finally:
-        if temporary_created and created_identity is not None:
-            _unlink_if_same_file(directory_fd, temporary_name, created_identity)
+        try:
+            if temporary_created and created_identity is not None:
+                _unlink_if_same_file(directory_fd, temporary_name, created_identity)
+        finally:
+            if temporary_fd is not None:
+                os.close(temporary_fd)
 
 
 class _QuietArgumentParser(argparse.ArgumentParser):
