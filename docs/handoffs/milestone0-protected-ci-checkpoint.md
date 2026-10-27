@@ -26,3 +26,7 @@ The release-security workflow is a separate gate. Its candidate/deployed manifes
 ## Disable and continuation
 
 Keep the PR draft and do not merge while protected enforcement or required evidence is missing. Revert a later isolated slice by its own commit; preserve the checkpoint. CR-0022 may proceed with synthetic red-first tests after this checkpoint, while packet distribution, enterprise data, release promotion, observed selection scoring, and the dashboard/control-plane build remain behind their existing gates.
+
+## Draft PR and first observed runner result
+
+[Draft PR #1](https://github.com/gvaibhav/openshell-deep-research-platform/pull/1) opened at `2c8759c`. The [first PR run](https://github.com/gvaibhav/openshell-deep-research-platform/actions/runs/40456775776) passed secret scan, exact lock CVEs/KEV, and configuration scan. Its quality job failed at `make check` because two historical evidence links were absolute Mac workspace paths. Those links were corrected to repository-relative paths without changing the historical finding. This is real PR-run evidence, but not protected enforcement or final-image/release proof. A later exact-head green run is still required.
