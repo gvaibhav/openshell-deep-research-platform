@@ -1,6 +1,6 @@
 # Matched pilot decision record template
 
-**Status:** Unfilled **proposed v5** selection template under [CR-0021](../docs/change-requests/CR-0021-citation-support-fairness.md) / [ToDo](../docs/todos/CR-0021-citation-support-fairness.md) and [CR-0022](../docs/change-requests/CR-0022-observed-cost-and-report-export.md) / [ToDo](../docs/todos/CR-0022-observed-cost-and-report-export.md). The current scorecard is v4; no v5 artifact or observed run exists. This file is not a selection decision.
+**Status:** Unfilled **proposed v5** selection template under [CR-0021](../docs/change-requests/CR-0021-citation-support-fairness.md) / [ToDo](../docs/todos/CR-0021-citation-support-fairness.md) and [CR-0022](../docs/change-requests/CR-0022-observed-cost-and-report-export.md) / [ToDo](../docs/todos/CR-0022-observed-cost-and-report-export.md). The current scorecard is v4; no v5 artifact or observed run exists. The isolated CR-0022 local cost/export helper does not produce a v5 scorecard or fill this record. This file is not a selection decision.
 
 ## Frozen inputs and reviewers
 

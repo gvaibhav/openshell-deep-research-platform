@@ -103,3 +103,9 @@ Random IDs and field filtering reduce label exposure; they cannot prove that ans
 The local file checks assume an operator-controlled OS identity and private directory ancestry. POSIX `mkdir` does not return a directory descriptor, and inode-checked cleanup is not an atomic defense against a hostile process sharing the custodian's UID. Use separate OS custody for an adversarial co-tenant; withhold packet distribution and label release if that isolation is unavailable.
 
 If approval, screening, witness provenance, packet-to-run corroboration, or later scorer binding is missing, withhold unblinding and the SEL decision. No production capability is controlled by this utility.
+
+The isolated cost/export helper under [CR-0022](../../docs/change-requests/CR-0022-observed-cost-and-report-export.md) / [ToDo](../../docs/todos/CR-0022-observed-cost-and-report-export.md) does not alter this signed protocol. It validates synthetic local object/artifact bindings only; independent cost/export corroboration, exact signed migration, and all external custody gates remain open. Cost and candidate labels still stay out of blind packets.
+
+Synthetic signing tests temporarily pin the running system’s absolute `/usr/bin/openssl` digest within each test context, retaining the root-ownership and actual signature checks. This test fixture does not change the application’s qualified verifier digest or qualify another operating system for observed signed artifacts. A dedicated negative test requires a changed executable digest to fail closed.
+
+The [Linux writer-local correction and review](../../docs/evidence/CR-0011-linux-publication-fd-review-2026-10-26.md) keeps the created inode alive during publication/cleanup. Its review separately tracks an unreproduced same-UID caller/packet identity-lifetime concern under CR-0011; do not infer comprehensive cleanup correctness or distribution approval from the writer fix.
