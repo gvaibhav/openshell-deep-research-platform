@@ -11,6 +11,8 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 from unittest.mock import patch
@@ -43,6 +45,35 @@ def save(path: Path, value: object) -> None:
         json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
         encoding="utf-8",
     )
+
+
+@contextmanager
+def created_artifact_descriptors() -> Iterator[list[tuple[str, int, tuple[int, int]]]]:
+    """Observe real created FDs; never forge stat identities or inode recycling."""
+    original_open = os.open
+    created: list[tuple[str, int, tuple[int, int]]] = []
+
+    def capture(path: Any, flags: int, *args: Any, **kwargs: Any) -> int:
+        descriptor = original_open(path, flags, *args, **kwargs)
+        if (
+            isinstance(path, str)
+            and flags & os.O_CREAT
+            and kwargs.get("dir_fd") is not None
+        ):
+            metadata = os.fstat(descriptor)
+            created.append((path, descriptor, (metadata.st_dev, metadata.st_ino)))
+        return descriptor
+
+    with patch("eval.blind_review.tool.os.open", side_effect=capture):
+        yield created
+
+
+def created_descriptor_alive(record: tuple[str, int, tuple[int, int]]) -> bool:
+    try:
+        metadata = os.fstat(record[1])
+    except OSError:
+        return False
+    return (metadata.st_dev, metadata.st_ino) == record[2]
 
 
 class BlindReviewTests(unittest.TestCase):
@@ -758,7 +789,7 @@ class BlindReviewTests(unittest.TestCase):
 
         def rename_after_packet_open(
             directory_fd: int, name: str, raw: bytes
-        ) -> tuple[int, int]:
+        ) -> blind_tool_module._CreatedFile:
             nonlocal switched, opened_original_directory
             if not switched and name.startswith("bp-"):
                 held = os.fstat(directory_fd)
@@ -791,6 +822,193 @@ class BlindReviewTests(unittest.TestCase):
         self.assertTrue(retired_packets.is_dir())
         self.assertEqual(list(retired_packets.iterdir()), [])
         self.assertFalse(self.map_path.exists())
+
+    def test_preparation_holds_all_artifact_fds_until_final_checks_then_closes(
+        self,
+    ) -> None:
+        original = blind_tool_module._assert_pinned_preparation_target
+        observed_lifetimes: list[bool] = []
+        with created_artifact_descriptors() as created:
+
+            def check_final(*args: Any) -> None:
+                original(*args)
+                if self.map_path.exists():
+                    observed_lifetimes.append(
+                        all(map(created_descriptor_alive, created))
+                    )
+
+            with patch(
+                "eval.blind_review.tool._assert_pinned_preparation_target",
+                side_effect=check_final,
+            ):
+                self._prepare()
+        self.assertTrue(observed_lifetimes)
+        self.assertTrue(all(observed_lifetimes))
+        self.assertEqual(len(created), 3)  # packet, manifest, private map
+        self.assertTrue(self.map_path.is_file())
+        for _, descriptor, _ in created:
+            with self.assertRaises(OSError):
+                os.fstat(descriptor)
+
+    def test_map_replacement_after_writer_return_preserves_foreign_file(self) -> None:
+        original = blind_tool_module._write_new_output
+        live_before_replacement: list[bool] = []
+        foreign = b"foreign map replacement"
+        with created_artifact_descriptors() as created:
+
+            def replace_after_return(*args: Any, **kwargs: Any) -> Any:
+                result = original(*args, **kwargs)
+                live_before_replacement.append(created_descriptor_alive(created[-1]))
+                self.map_path.unlink()
+                self.map_path.write_bytes(foreign)
+                return result
+
+            with (
+                patch(
+                    "eval.blind_review.tool._write_new_output",
+                    side_effect=replace_after_return,
+                ),
+                self.assertRaises(BlindReviewError),
+            ):
+                self._prepare()
+        self.assertEqual(live_before_replacement, [True])
+        self.assertEqual(self.map_path.read_bytes(), foreign)
+        self.assertFalse(self.packet_dir.exists())
+        for _, descriptor, _ in created:
+            with self.assertRaises(OSError):
+                os.fstat(descriptor)
+
+    def test_packet_replacement_stays_open_through_rollback_and_is_preserved(
+        self,
+    ) -> None:
+        original_write = blind_tool_module._write_exclusive_at
+        original_unlink = blind_tool_module._unlink_if_same_file
+        foreign = b"foreign packet replacement"
+        packet_name: str | None = None
+        rollback_lifetimes: list[bool] = []
+        with created_artifact_descriptors() as created:
+
+            def replace_packet(directory_fd: int, name: str, raw: bytes) -> Any:
+                nonlocal packet_name
+                result = original_write(directory_fd, name, raw)
+                if name.startswith("bp-"):
+                    packet_name = name
+                    (self.packet_dir / name).unlink()
+                    (self.packet_dir / name).write_bytes(foreign)
+                return result
+
+            def check_rollback(
+                directory_fd: int, name: str, identity: tuple[int, int]
+            ) -> bool:
+                if name == packet_name:
+                    rollback_lifetimes.append(created_descriptor_alive(created[0]))
+                return original_unlink(directory_fd, name, identity)
+
+            with (
+                patch(
+                    "eval.blind_review.tool._write_exclusive_at",
+                    side_effect=replace_packet,
+                ),
+                patch(
+                    "eval.blind_review.tool._write_new_output",
+                    side_effect=OSError("injected map failure"),
+                ),
+                patch(
+                    "eval.blind_review.tool._unlink_if_same_file",
+                    side_effect=check_rollback,
+                ),
+                self.assertRaises(BlindReviewError),
+            ):
+                self._prepare()
+        self.assertEqual(rollback_lifetimes, [True])
+        assert packet_name is not None
+        self.assertEqual((self.packet_dir / packet_name).read_bytes(), foreign)
+        self.assertEqual(
+            [path.name for path in self.packet_dir.iterdir()], [packet_name]
+        )
+        self.assertFalse(self.map_path.exists())
+        for _, descriptor, _ in created:
+            with self.assertRaises(OSError):
+                os.fstat(descriptor)
+
+    def test_packet_or_manifest_replacement_cannot_finish_preparation(self) -> None:
+        original_write = blind_tool_module._write_exclusive_at
+        foreign = b"foreign artifact replacement"
+        for kind in ("packet", "manifest"):
+            with self.subTest(kind=kind):
+                self.packet_dir = self.root / f"packets-{kind}"
+                self.map_path = self.root / "custodian" / f"map-{kind}.json"
+                replaced: list[Path] = []
+
+                def replace_artifact(
+                    directory_fd: int,
+                    name: str,
+                    raw: bytes,
+                    selected_kind: str = kind,
+                    replacement_paths: list[Path] = replaced,
+                ) -> Any:
+                    result = original_write(directory_fd, name, raw)
+                    if (selected_kind == "packet" and name.startswith("bp-")) or (
+                        selected_kind == "manifest" and name == "packet-manifest.json"
+                    ):
+                        path = self.packet_dir / name
+                        path.unlink()
+                        path.write_bytes(foreign)
+                        replacement_paths.append(path)
+                    return result
+
+                with (
+                    created_artifact_descriptors() as created,
+                    patch(
+                        "eval.blind_review.tool._write_exclusive_at",
+                        side_effect=replace_artifact,
+                    ),
+                    self.assertRaises(BlindReviewError),
+                ):
+                    self._prepare()
+                self.assertEqual(len(replaced), 1)
+                self.assertEqual(replaced[0].read_bytes(), foreign)
+                self.assertEqual(list(self.packet_dir.iterdir()), replaced)
+                self.assertFalse(self.map_path.exists())
+                for _, descriptor, _ in created:
+                    with self.assertRaises(OSError):
+                        os.fstat(descriptor)
+
+    def test_failed_packet_write_holds_descriptor_until_cleanup_then_closes(
+        self,
+    ) -> None:
+        self.packet_dir.mkdir(mode=0o700)
+        directory_fd = os.open(self.packet_dir, os.O_RDONLY | os.O_DIRECTORY)
+        original_unlink = blind_tool_module._unlink_if_same_file
+        rollback_lifetimes: list[bool] = []
+        try:
+            with created_artifact_descriptors() as created:
+
+                def check_rollback(*args: Any) -> bool:
+                    rollback_lifetimes.append(created_descriptor_alive(created[0]))
+                    return original_unlink(*args)
+
+                with (
+                    patch(
+                        "eval.blind_review.tool.os.fsync",
+                        side_effect=OSError("injected file sync failure"),
+                    ),
+                    patch(
+                        "eval.blind_review.tool._unlink_if_same_file",
+                        side_effect=check_rollback,
+                    ),
+                    self.assertRaises(BlindReviewError),
+                ):
+                    blind_tool_module._write_exclusive_at(
+                        directory_fd, "packet.json", b"synthetic"
+                    )
+            self.assertEqual(rollback_lifetimes, [True])
+            self.assertFalse((self.packet_dir / "packet.json").exists())
+            for _, descriptor, _ in created:
+                with self.assertRaises(OSError):
+                    os.fstat(descriptor)
+        finally:
+            os.close(directory_fd)
 
     def test_preexisting_map_inserted_after_path_check_is_preserved(self) -> None:
         original = blind_tool_module._validate_prepare_paths

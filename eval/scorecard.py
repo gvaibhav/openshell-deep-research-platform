@@ -1806,12 +1806,30 @@ def _unlink_if_same_file(
         return False
 
 
+@dataclass
+class _CreatedFile:
+    """Own the created inode until the caller finishes checks and rollback."""
+
+    descriptor: int | None
+
+    @property
+    def identity(self) -> tuple[int, int]:
+        if self.descriptor is None:
+            raise EvaluationError("created file handle is already closed")
+        return _directory_identity(self.descriptor)
+
+    def close(self) -> None:
+        if self.descriptor is not None:
+            descriptor, self.descriptor = self.descriptor, None
+            os.close(descriptor)
+
+
 def _write_new_output(
     target: _OutputTarget,
     rendered: str | bytes,
     binding_catalog: BindingCatalog | None = None,
-) -> tuple[int, int]:
-    """Publish complete bytes without replacing or following an existing target."""
+) -> _CreatedFile:
+    """Publish exclusive bytes; caller owns the returned handle and must close it."""
     _assert_output_target(target)
     directory_fd = target.directory_fd
     temporary_name = f".scorecard-{secrets.token_hex(16)}.tmp"
@@ -1872,7 +1890,9 @@ def _write_new_output(
         os.fsync(directory_fd)
         _assert_output_target(target, parent_was_written=True, require_fresh=False)
         _assert_output_catalog(binding_catalog, allow_parent_write=True)
-        return created_identity
+        created = _CreatedFile(temporary_fd)
+        temporary_fd = None  # Transfer lifetime through the caller's final checks.
+        return created
     except (OSError, EvaluationError) as exc:
         if (
             published
@@ -1979,7 +1999,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 output_target,
                 rendered,
                 binding_catalog=catalog,
-            )
+            ).close()
         elif args.allow_incomplete and report["decision_readiness"] == "incomplete":
             sys.stdout.write(
                 json.dumps(

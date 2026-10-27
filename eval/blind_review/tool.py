@@ -24,6 +24,7 @@ from eval.scorecard import (
     _assert_output_target,
     _attach_packet_directory,
     _close_output_target,
+    _CreatedFile,
     _directory_identity,
     _open_output_target,
     _OutputTarget,
@@ -724,13 +725,12 @@ def _assert_pinned_preparation_target(
         raise BlindReviewError("preparation target differs from initial route")
 
 
-def _write_exclusive_at(directory_fd: int, name: str, raw: bytes) -> tuple[int, int]:
-    """Write one new packet artifact through its held directory descriptor."""
+def _write_exclusive_at(directory_fd: int, name: str, raw: bytes) -> _CreatedFile:
+    """Write a packet artifact; caller owns its handle through final validation."""
     if not name or name in (".", "..") or "/" in name:
         raise BlindReviewError("packet artifact name is invalid")
-    descriptor = -1
+    descriptor: int | None = None
     identity: tuple[int, int] | None = None
-    completed = False
     try:
         descriptor = os.open(
             name,
@@ -744,15 +744,18 @@ def _write_exclusive_at(directory_fd: int, name: str, raw: bytes) -> tuple[int, 
             handle.write(raw)
             handle.flush()
         os.fsync(descriptor)
-        completed = True
-        return identity
+        created = _CreatedFile(descriptor)
+        descriptor = None
+        return created
     except OSError as exc:
         raise BlindReviewError("packet artifact could not be written") from exc
     finally:
-        if descriptor >= 0:
-            os.close(descriptor)
-        if not completed and identity is not None:
-            _unlink_if_same_file(directory_fd, name, identity)
+        if descriptor is not None:
+            try:
+                if identity is not None:
+                    _unlink_if_same_file(directory_fd, name, identity)
+            finally:
+                os.close(descriptor)
 
 
 def _assert_created_packet_directory(
@@ -780,7 +783,7 @@ def _cleanup_created_packets(
     packet_target: _OutputTarget | None,
     packet_directory_fd: int,
     created_identity: tuple[int, int] | None,
-    created_files: list[tuple[str, tuple[int, int]]],
+    created_files: list[tuple[str, _CreatedFile]],
 ) -> None:
     """Never recursively remove a path chosen through a mutable ancestor."""
     if packet_target is None or created_identity is None:
@@ -789,8 +792,8 @@ def _cleanup_created_packets(
         packet_directory_fd >= 0
         and _directory_identity(packet_directory_fd) == created_identity
     ):
-        for name, identity in reversed(created_files):
-            _unlink_if_same_file(packet_directory_fd, name, identity)
+        for name, created in reversed(created_files):
+            _unlink_if_same_file(packet_directory_fd, name, created.identity)
     try:
         observed = os.stat(
             packet_target.path.name,
@@ -925,8 +928,8 @@ def prepare_packets(
     packet_fd = -1
     packet_identity: tuple[int, int] | None = None
     packet_confirmed = False
-    map_identity: tuple[int, int] | None = None
-    created_files: list[tuple[str, tuple[int, int]]] = []
+    map_file: _CreatedFile | None = None
+    created_files: list[tuple[str, _CreatedFile]] = []
     try:
         map_target = _open_output_target(
             map_path,
@@ -980,7 +983,7 @@ def prepare_packets(
         _assert_pinned_preparation_target(map_target, map_parent_pin)
         _assert_pinned_preparation_target(packet_target, packet_parent_pin)
         map_target = _attach_packet_directory(map_target, packet_dir, packet_fd)
-        map_identity = _write_new_output(map_target, map_raw)
+        map_file = _write_new_output(map_target, map_raw)
         _assert_output_target(map_target, parent_was_written=True, require_fresh=False)
         _assert_created_packet_directory(packet_target, packet_fd)
         _assert_pinned_preparation_target(map_target, map_parent_pin)
@@ -992,12 +995,21 @@ def prepare_packets(
         )
         if (
             not stat.S_ISREG(map_metadata.st_mode)
-            or (map_metadata.st_dev, map_metadata.st_ino) != map_identity
+            or (map_metadata.st_dev, map_metadata.st_ino) != map_file.identity
         ):
             raise BlindReviewError("concealed map identity changed")
+        for name, created in created_files:
+            metadata = os.stat(name, dir_fd=packet_fd, follow_symlinks=False)
+            if (
+                not stat.S_ISREG(metadata.st_mode)
+                or (metadata.st_dev, metadata.st_ino) != created.identity
+            ):
+                raise BlindReviewError("created packet artifact identity changed")
     except (OSError, BlindReviewError, EvaluationError) as exc:
-        if map_target is not None and map_identity is not None:
-            _unlink_if_same_file(map_target.directory_fd, map_path.name, map_identity)
+        if map_target is not None and map_file is not None:
+            _unlink_if_same_file(
+                map_target.directory_fd, map_path.name, map_file.identity
+            )
         _cleanup_created_packets(
             packet_target,
             packet_fd,
@@ -1006,6 +1018,10 @@ def prepare_packets(
         )
         raise BlindReviewError("packet artifacts could not be written") from exc
     finally:
+        if map_file is not None:
+            map_file.close()
+        for _, created in created_files:
+            created.close()
         if packet_fd >= 0:
             os.close(packet_fd)
         if packet_target is not None:
@@ -2237,7 +2253,7 @@ def verify_and_unblind(
         control_public_key_path,
     ]
     target: _OutputTarget | None = None
-    published_identity: tuple[int, int] | None = None
+    published_file: _CreatedFile | None = None
     released = False
     try:
         target = _open_output_target(
@@ -2273,7 +2289,7 @@ def verify_and_unblind(
         raw = _encoded_file(output)
         if len(raw) > MAX_INPUT_BYTES:
             raise BlindReviewError("unblinded assignment exceeds its byte bound")
-        published_identity = _write_new_output(target, raw)
+        published_file = _write_new_output(target, raw)
         _assert_output_target(target, parent_was_written=True, require_fresh=False)
         _assert_unblind_private_parent(target, map_path)
         metadata = os.stat(
@@ -2281,7 +2297,7 @@ def verify_and_unblind(
         )
         if (
             not stat.S_ISREG(metadata.st_mode)
-            or (metadata.st_dev, metadata.st_ino) != published_identity
+            or (metadata.st_dev, metadata.st_ino) != published_file.identity
         ):
             raise BlindReviewError("unblinded output identity changed")
         released = True
@@ -2290,10 +2306,16 @@ def verify_and_unblind(
         raise BlindReviewError("unblinded output could not be published") from exc
     finally:
         if target is not None:
-            if published_identity is not None and not released:
-                _unlink_if_same_file(
-                    target.directory_fd, output_path.name, published_identity
-                )
+            if published_file is not None:
+                try:
+                    if not released:
+                        _unlink_if_same_file(
+                            target.directory_fd,
+                            output_path.name,
+                            published_file.identity,
+                        )
+                finally:
+                    published_file.close()
             _close_output_target(target)
 
 

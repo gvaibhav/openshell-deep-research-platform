@@ -1104,6 +1104,100 @@ class SignedBindingTests(unittest.TestCase):
         self.assertFalse(f.unblinded_path.exists())
         self.assertEqual(list(private_parent.glob(".scorecard-*.tmp")), [])
 
+    def test_unblind_caller_retains_file_until_final_check_and_closes_on_success(
+        self,
+    ) -> None:
+        f = self.fixture
+        original_open = os.open
+        original_check = blind_tool_module._assert_unblind_private_parent
+        created: list[int] = []
+        live_at_final: list[bool] = []
+
+        def capture(path: Any, flags: int, *args: Any, **kwargs: Any) -> int:
+            descriptor = original_open(path, flags, *args, **kwargs)
+            if (
+                isinstance(path, str)
+                and path.startswith(".scorecard-")
+                and flags & os.O_CREAT
+            ):
+                created.append(descriptor)
+            return descriptor
+
+        def check_final(*args: Any) -> None:
+            original_check(*args)
+            if f.unblinded_path.exists():
+                try:
+                    held = os.fstat(created[0])
+                    current = f.unblinded_path.stat()
+                    live_at_final.append(
+                        (held.st_dev, held.st_ino) == (current.st_dev, current.st_ino)
+                    )
+                except OSError:
+                    live_at_final.append(False)
+
+        with (
+            patch("eval.scorecard.os.open", side_effect=capture),
+            patch(
+                "eval.blind_review.tool._assert_unblind_private_parent",
+                side_effect=check_final,
+            ),
+        ):
+            f.unblind()
+        self.assertEqual(live_at_final, [True])
+        self.assertEqual(len(created), 1)
+        self.assertTrue(f.unblinded_path.is_file())
+        with self.assertRaises(OSError):
+            os.fstat(created[0])
+
+    def test_unblind_replacement_after_writer_return_is_denied_and_preserved(
+        self,
+    ) -> None:
+        f = self.fixture
+        original_open = os.open
+        original_write = blind_tool_module._write_new_output
+        created: list[int] = []
+        live_before_replacement: list[bool] = []
+        foreign = b"foreign unblinded replacement"
+
+        def capture(path: Any, flags: int, *args: Any, **kwargs: Any) -> int:
+            descriptor = original_open(path, flags, *args, **kwargs)
+            if (
+                isinstance(path, str)
+                and path.startswith(".scorecard-")
+                and flags & os.O_CREAT
+            ):
+                created.append(descriptor)
+            return descriptor
+
+        def replace_after_return(*args: Any, **kwargs: Any) -> Any:
+            result = original_write(*args, **kwargs)
+            try:
+                held = os.fstat(created[0])
+                current = f.unblinded_path.stat()
+                live_before_replacement.append(
+                    (held.st_dev, held.st_ino) == (current.st_dev, current.st_ino)
+                )
+            except OSError:
+                live_before_replacement.append(False)
+            f.unblinded_path.unlink()
+            f.unblinded_path.write_bytes(foreign)
+            return result
+
+        with (
+            patch("eval.scorecard.os.open", side_effect=capture),
+            patch(
+                "eval.blind_review.tool._write_new_output",
+                side_effect=replace_after_return,
+            ),
+            self.assertRaises(BlindReviewError),
+        ):
+            f.unblind()
+        self.assertEqual(live_before_replacement, [True])
+        self.assertEqual(f.unblinded_path.read_bytes(), foreign)
+        self.assertEqual(len(created), 1)
+        with self.assertRaises(OSError):
+            os.fstat(created[0])
+
     def test_v1_receipt_and_wrong_trust_pin_cannot_support_readiness(self) -> None:
         f = self.fixture
         receipt = json.loads(f.receipt_path.read_text(encoding="utf-8"))
