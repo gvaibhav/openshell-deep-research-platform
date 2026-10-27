@@ -3,23 +3,23 @@
 
 from __future__ import annotations
 
-import json
 import hashlib
-from copy import deepcopy
+import json
 import re
 import sys
+from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import unquote
 
-from jsonschema import Draft202012Validator, FormatChecker
+import yaml  # type: ignore[import-untyped]
+from jsonschema import Draft202012Validator, FormatChecker, SchemaError
 from referencing import Registry, Resource
-import yaml
-
 
 ROOT = Path(__file__).resolve().parents[1]
 CONTRACTS = ROOT / "contracts"
 EXAMPLES = ROOT / "examples"
+SCHEMA_DIRS = (CONTRACTS, ROOT / "eval" / "schemas", ROOT / "eval" / "mcp_fixture")
 EXAMPLE_SCHEMAS = {
     "job-request.json": "job-request.schema.json",
     "job-policy.json": "job-policy.schema.json",
@@ -197,22 +197,38 @@ def stage_can_read_evidence(
     )
 
 
-def check_contracts(errors: list[str]) -> tuple[int, int]:
-    unregistered_examples = sorted(
-        path.name for path in EXAMPLES.glob("*.json") if path.name not in EXAMPLE_SCHEMAS
-    )
-    for example_name in unregistered_examples:
-        errors.append(f"Unregistered JSON example: examples/{example_name}")
-    schemas = {}
-    for path in sorted(CONTRACTS.glob("*.schema.json")):
+def repository_schema_paths() -> list[Path]:
+    """Include contract and local evaluation schemas in the repository gate."""
+    paths = [path for directory in SCHEMA_DIRS for path in directory.glob("*.schema.json")]
+    return sorted(paths)
+
+
+def load_repository_schemas(errors: list[str]) -> dict[str, dict]:
+    """Validate each local JSON Schema before constructing the example registry."""
+    schemas: dict[str, dict] = {}
+    for path in repository_schema_paths():
         try:
             schema = read_json(path)
             Draft202012Validator.check_schema(schema)
             if schema["$id"] in schemas:
                 errors.append(f"Duplicate schema ID: {schema['$id']}")
             schemas[schema["$id"]] = schema
-        except (OSError, ValueError, KeyError, TypeError) as exc:
-            errors.append(f"{path.relative_to(ROOT)}: {exc}")
+        except (OSError, ValueError, KeyError, TypeError, SchemaError) as exc:
+            try:
+                shown = path.relative_to(ROOT)
+            except ValueError:
+                shown = path
+            errors.append(f"{shown}: {exc}")
+    return schemas
+
+
+def check_contracts(errors: list[str]) -> tuple[int, int]:
+    unregistered_examples = sorted(
+        path.name for path in EXAMPLES.glob("*.json") if path.name not in EXAMPLE_SCHEMAS
+    )
+    for example_name in unregistered_examples:
+        errors.append(f"Unregistered JSON example: examples/{example_name}")
+    schemas = load_repository_schemas(errors)
 
     registry = Registry().with_resources(
         (schema_id, Resource.from_contents(schema))
@@ -630,8 +646,8 @@ def check_contracts(errors: list[str]) -> tuple[int, int]:
         attempts_by_id = {stage["attempt_id"]: stage for stage in all_stages}
         for stage in all_stages:
             for evidence_id in stage.get("context_evidence_ids", []):
-                record = records_by_id.get(evidence_id)
-                if record is None or not stage_can_read_evidence(stage, record, attempts_by_id):
+                candidate_record = records_by_id.get(evidence_id)
+                if candidate_record is None or not stage_can_read_evidence(stage, candidate_record, attempts_by_id):
                     errors.append("Example stage projects evidence outside its retrieval mode and trusted attempt")
         if stage_can_read_evidence(slack_standard_stage, derived_evidence, attempts_by_id):
             errors.append("Contract guard failed: standard Slack attempt read A-derived Slack evidence")

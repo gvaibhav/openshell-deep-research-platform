@@ -1,0 +1,103 @@
+name: PR checks
+
+'on':
+  pull_request:
+  push:
+    branches: [main]
+  merge_group:
+    types: [checks_requested]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: contracts, lint, types, tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13.17'
+      - name: Validate exact dependency inventories
+        run: make lockcheck
+      - name: Install pinned development tools without resolver drift
+        run: |
+          python -m pip install --no-deps --only-binary=:all: -r requirements-dev.lock
+      - name: Confirm pinned environment is complete
+        run: python -m pip check
+      - name: Validate design and contracts
+        run: make check
+      - name: Behavior tests
+        run: make test
+      - name: Lint Python
+        run: make lint
+      - name: Type-check implementation
+        run: make typecheck
+
+  secrets:
+    name: secret scan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13.17'
+      - uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567 # v0.3.1
+        with:
+          version: v0.76.1
+      - name: Prove the secret scanner rejects a synthetic canary
+        run: python3 -m scripts.build_security.secret_canary
+      - name: Scan checked-out content without ignore rules
+        run: trivy fs --scanners secret --ignorefile '' --exit-code 1 .
+
+  dependencies:
+    name: exact lock CVEs and KEV
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13.17'
+      - uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567 # v0.3.1
+        with:
+          version: v0.76.1
+      - name: Scan direct and transitive development dependencies
+        run: python -m scripts.build_security.scan dependencies --lock requirements-dev.lock --output "$RUNNER_TEMP/dependency-evidence/dev"
+      - name: Scan direct and transitive worker dependencies
+        run: python -m scripts.build_security.scan dependencies --lock spikes/full_graph/requirements-worker.lock --output "$RUNNER_TEMP/dependency-evidence/worker"
+      - name: Retain exact scan and advisory evidence
+        if: always()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: dependency-evidence-${{ github.run_id }}
+          path: ${{ runner.temp }}/dependency-evidence
+          if-no-files-found: ignore
+          retention-days: 30
+
+  configuration:
+    name: deployment misconfiguration scan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567 # v0.3.1
+        with:
+          version: v0.76.1
+      - name: Scan configuration separately from package CVEs
+        run: trivy config --ignorefile '' --skip-dirs docs --skip-dirs eval --skip-dirs contracts --skip-dirs examples --severity HIGH,CRITICAL --exit-code 1 .

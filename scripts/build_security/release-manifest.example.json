@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "profile": "spike",
+  "uses_kubernetes": false,
+  "gcp_host_relay_enabled": false,
+  "dependency_locks": [
+    "spikes/full_graph/requirements-worker.lock"
+  ],
+  "images": {
+    "spike_worker": "REPLACE_WITH_FINAL_REGISTRY_REFERENCE_AT_SHA256_DIGEST",
+    "openshell_gateway": "REPLACE_WITH_OBSERVED_GATEWAY_REFERENCE_AT_SHA256_DIGEST",
+    "openshell_supervisor": "REPLACE_WITH_OBSERVED_SUPERVISOR_REFERENCE_AT_SHA256_DIGEST",
+    "openshell_runtime": "REPLACE_WITH_OBSERVED_RUNTIME_REFERENCE_AT_SHA256_DIGEST"
+  },
+  "platforms": {
+    "spike_worker": "linux/arm64",
+    "openshell_gateway": "REPLACE_WITH_OBSERVED_PLATFORM_LINUX_AMD64_OR_ARM64",
+    "openshell_supervisor": "REPLACE_WITH_OBSERVED_PLATFORM_LINUX_AMD64_OR_ARM64",
+    "openshell_runtime": "REPLACE_WITH_OBSERVED_PLATFORM_LINUX_AMD64_OR_ARM64"
+  }
+}

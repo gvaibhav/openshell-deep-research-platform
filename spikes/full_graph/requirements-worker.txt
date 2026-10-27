@@ -1,0 +1,7 @@
+# Direct compatibility pins verified against official release metadata on 2026-10-26.
+# This is NOT the transitive/hash lock required by Dockerfile and promotion.
+deepagents==0.7.32
+langchain==1.4.7
+langchain-core==1.7.0
+langgraph==1.2.17
+langchain-openai==1.7.2

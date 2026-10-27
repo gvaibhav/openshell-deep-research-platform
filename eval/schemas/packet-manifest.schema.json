@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openshell-deep-research.invalid/eval/v2/packet-manifest.schema.json",
+  "title": "Anonymous completed-cell packet manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "cell_count", "packet_count", "corpus_digest", "source_pack_digest", "rubric_digest", "packets"],
+  "properties": {
+    "schema_version": {"const": 2},
+    "cell_count": {"type": "integer", "minimum": 1, "maximum": 240},
+    "packet_count": {"type": "integer", "minimum": 0, "maximum": 128},
+    "corpus_digest": {"$ref": "#/$defs/digest"},
+    "source_pack_digest": {"$ref": "#/$defs/digest"},
+    "rubric_digest": {"$ref": "#/$defs/digest"},
+    "packets": {"type": "array", "maxItems": 128, "items": {"$ref": "#/$defs/packet"}}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "packet": {
+      "type": "object", "additionalProperties": false,
+      "required": ["packet_id", "packet_sha256"],
+      "properties": {
+        "packet_id": {"type": "string", "pattern": "^bp-[0-9a-f]{32}$"},
+        "packet_sha256": {"$ref": "#/$defs/digest"}
+      }
+    }
+  }
+}

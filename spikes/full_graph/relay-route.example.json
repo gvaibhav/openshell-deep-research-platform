@@ -1,0 +1,14 @@
+{
+  "provider_id": "openai",
+  "data_class": "synthetic",
+  "credential_mode": "host_env",
+  "stage_id": "stage-aurora-1",
+  "model_id": "gpt-5.6-sol",
+  "upstream_url": "https://api.openai.com/v1/chat/completions",
+  "max_requests": 8,
+  "max_input_bytes": 16384,
+  "max_output_tokens": 256,
+  "max_spend_micro_usd": 60000,
+  "input_micro_usd_per_million_tokens": 4000000,
+  "output_micro_usd_per_million_tokens": 20000000
+}

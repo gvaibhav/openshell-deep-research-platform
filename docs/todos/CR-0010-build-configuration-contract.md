@@ -14,7 +14,8 @@
 
 - [x] Create a tracked nonsecret `.env.example`, an ignored owner-readable `.env`, and an ignored `.secrets/` path.
 - [x] Record the staged build plan, impact analysis, and direct CR/ToDo links in the primary design, README, and index.
-- [ ] Record user approval before spike code starts; complete the SEL-01/02/04/05 selection decision before full dashboard/API code starts.
+- [x] Record user approval before spike code starts (2026-10-26).
+- [ ] Complete the SEL-01/02/04/05 selection decision before full dashboard/API code starts.
 - [ ] Implement a typed post-selection loader for `fixture`, `sandbox_spike`, `live_public`, and `enterprise`; treat `RESEARCH_DEPLOYMENT_TARGET` as advisory only.
 - [ ] Package fixture/spike providers only in a development artifact; make the release image reject both profiles independently of env target. Test signed-digest admission as code and in a disposable cluster; verify the signed release digest before a network-accessible live public VM start and enforce it on each selected staging/production cluster before deployment.
 - [ ] Resolve model, Okta, and source credentials only from the owning service's approved secret or workload-identity reference. Require the reference matching the selected auth mode; never accept browser or worker secret values as configuration authority.

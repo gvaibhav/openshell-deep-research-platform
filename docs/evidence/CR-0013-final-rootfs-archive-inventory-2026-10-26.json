@@ -1,0 +1,18 @@
+{
+  "candidates": [],
+  "captured_at": "2026-10-26T19:32:51.805540+00:00",
+  "complete": true,
+  "container_image_id": "sha256:8548ebaf60475d442eb8dae16b1b414a66283f68ec369af2ed4f2e7f49be1292",
+  "entries_seen": 20520,
+  "export_bytes": 292227584,
+  "export_sha256": "ef4af9ef6bbcb0b22949de5e13f915c3783ebd4b03e1f52f0253a365a7db29dc",
+  "observed_architecture": "arm64",
+  "observed_os": "linux",
+  "platform": "linux/arm64",
+  "ref": "localhost/openshell-research-spike@sha256:8548ebaf60475d442eb8dae16b1b414a66283f68ec369af2ed4f2e7f49be1292",
+  "regular_files_seen": 18262,
+  "resolved_descriptor_digest": "sha256:5feb045b50a621868448115b70e9deae50fbaa376708c87e69e46efba6ac6b99",
+  "resolved_image_id": "sha256:5feb045b50a621868448115b70e9deae50fbaa376708c87e69e46efba6ac6b99",
+  "schema_version": 1,
+  "source": "docker-container-export"
+}

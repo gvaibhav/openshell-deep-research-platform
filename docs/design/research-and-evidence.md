@@ -107,6 +107,42 @@ The gate owns authoritative model request, token, and cost accounting. Before di
 
 The gate stores reservations and settlements in a serializable ledger whose recovery is independent of application database PITR. A restore advances the external recovery generation and closes model spending while the authoritative ledger head, every in-flight or ambiguous reservation, and remaining limits are reconciled. An old job row or stage manifest cannot reset spend. Unknown upstream usage retains the full safe reservation; if that bound or the ledger head cannot be recovered, the affected job stays on recovery hold instead of automatically resuming. A new attempt inherits the reconciled cumulative charge. [Job lifecycle and restore](job-lifecycle.md#database-restore-is-a-separate-recovery-path).
 
+### Production provider adapter and route-catalog impact
+
+The user's OpenAI `gpt-5.6-sol` choice and request for a future provider switch require an explicit seam in the **post-selection application**. The [disposable host adapter](../change-requests/CR-0014-local-model-provider-router.md) establishes only a synthetic comparison path. The existing RES-11 server-held `model_route` promise is unchanged; impact DR-MODEL-002 makes the production provider-neutral implementation and proof visible through [CR-0017](../change-requests/CR-0017-production-model-route-adapters.md) and its [ToDo](../todos/CR-0017-production-model-route-adapters.md). [CR-0015](../change-requests/CR-0015-phase0-attempt-identity-readiness.md) / [ToDo](../todos/CR-0015-phase0-attempt-identity-readiness.md) separately own initial attempt readiness, and [CR-0016](../change-requests/CR-0016-phase1-sender-origin-proof.md) / [ToDo](../todos/CR-0016-phase1-sender-origin-proof.md) own private sender origin. None of these application components exists yet.
+
+The gate resolves a worker-visible opaque alias against a **versioned, owner-reviewed route catalog**. Each route fixes adapter ID, vendor endpoint/model, request and response schemas, data class, credential reference, tokenizer or conservative bounds, price revision, trace/retention policy, and budget. A provider adapter maps only an admitted canonical request to that vendor's native protocol and maps only approved response and usage fields back. It cannot choose a new endpoint, class, model, or key from worker input. A provider switch changes the reviewed catalog revision and admits a fresh immutable snapshot and attempt; active attempts remain pinned or are fenced, with no automatic fallback. The first adapter may use the user's chosen OpenAI route if approved for the data class and actual environment. A second fake adapter is sufficient to prove the seam before another vendor is selected.
+
+```mermaid
+flowchart LR
+    Worker[Bound sandbox worker] --> Gate[Trusted model gate]
+    Gate --> Ready[Current attempt and class check]
+    Ready --> Catalog[Versioned route alias catalog]
+    Catalog --> Budget[Atomic maximum reservation]
+    Budget --> Adapter{Reviewed adapter ID}
+    Adapter -->|OpenAI route| OpenAI[Exact approved OpenAI model]
+    Adapter -->|Later approved route| Other[Exact other provider model]
+    OpenAI --> Usage[Bounded output and verified usage]
+    Other --> Usage
+    Usage --> Gate
+```
+
+**Assumptions and threat delta:** the worker has no vendor credential, chooses no arbitrary route, and sees only the internal gate endpoint. A generic compatibility URL or provider fallback could silently change the model, data terms, or price; a multimodal/nested body could bypass text-only review; a provider-side usage omission could falsely release budget. The gate therefore rejects unknown adapters, changed host/model/body, unreviewed nested tool/file/URL/content fields, over-class data, pre-ready or stale attempts, and any request without a safe conservative reservation **before** upstream dispatch. It accepts only a ready current attempt whose exact approved route, class, native body, bounded response, and usage handling match the catalog. Cancellation fences the active provider request and retains uncertain spend. This is a model/data/credential boundary, independent of the browser's Okta login or the source broker's OAuth flow.
+
+| Surface | Disposition, revision, and pre-implementation gate | Impact |
+|---|---|---|
+| README and numbered requirements | **README affected:** [tracked obligation](../../README.md#tracked-change-requests) identifies the production adapter separately from the disposable spike. **Requirements not affected:** RES-11 and NFR-07 already require exact route, class, and budget enforcement; the adapter seam is an implementation choice. | DR-MODEL-002 |
+| Architecture and design handoffs | **Affected:** this primary design, [implementation milestone](implementation-plan.md#3-milestones-and-exit-evidence), [architecture model hop](../architecture.md#3-trust-and-identity-boundaries), and [deployment gate](deployment-and-operations.md#10-promotion-integration-gates) name the catalog/adapter obligation. **Not affected:** Okta handoff, job visibility, and source broker have no new identity or token exchange. Job lifecycle keeps the existing immutable route snapshot rule. | DR-MODEL-002 |
+| OpenAPI, JSON Schema, and other contracts | **Existing browser/stage `model_route` alias not affected:** no client-supplied vendor fields are added. **Planned internal contract affected:** CR-0017 [ToDo](../todos/CR-0017-production-model-route-adapters.md) requires a versioned route-catalog/adapter schema under `contracts/internal/` before dependent gate code. | DR-MODEL-002 |
+| Examples and fixtures | **Affected:** first exact OpenAI route, denied unknown/mismatched/multimodal routes, and second fake adapter/switch examples belong to the planned internal contract; no enterprise source fixture is changed. | DR-MODEL-002 |
+| Component documentation, code, and configuration | **Affected:** future model gate, provider adapters, route catalog, and release configuration under CR-0017. The `.env.example` model values remain nonsecret approval inputs, not route authority; the CR-0014 spike relay remains a separate disposable component. | DR-MODEL-002 |
+| Deployment, operations, and security controls | **Affected for proof:** server-side credential custody, route disable/revision, class and trace approval, active-call cancellation, independently recoverable usage, and CVE/SBOM coverage need component evidence before live public traffic. | DR-MODEL-002 |
+| Tests, evaluations, and release gates | **Affected:** fake-upstream allow/deny, second-adapter swap, wrong model on same host, nested-body/class/budget denials, active-cancel/restore tests, approved real nonproduction observation, and independent review. Existing matched SEL evaluation stays a separate selection prerequisite. | DR-MODEL-002 |
+
+| Impact | Independently verifiable obligation | Change request | Paired ToDo |
+|---|---|---|---|
+| DR-MODEL-002 | Implement a reviewed production model-route catalog and provider adapters with exact request, class, custody, usage, and cancellation enforcement after selection | [CR-0017](../change-requests/CR-0017-production-model-route-adapters.md) | [ToDo](../todos/CR-0017-production-model-route-adapters.md) |
+
 ## 3. Tool scope and source retrieval
 
 The worker loads a **pinned, typed** catalog of read operations intersected with its stage manifest. It does not turn an upstream MCP `tools/list` response into unrestricted model tools. Each catalog entry has an input schema, source identity mode, resource selector rules, time-window limit, output cap, and a mapping to an upstream MCP tool or API call. The broker validates these after resolving the worker's job identity to the server-side policy and the current source partition. The job API applies the same stage partition to `read_evidence`: a retrieval sandbox cannot fetch another private partition's evidence by guessing an ID. OpenShell's `protocol: mcp` rule is configured with `enforcement: enforce` for the broker endpoint and named methods/tools; its tool-name checks are a second layer because OpenShell does not match tool arguments or parse the server response. [OpenShell MCP network rules](https://docs.nvidia.com/openshell/how-it-works/policies/network-rules).

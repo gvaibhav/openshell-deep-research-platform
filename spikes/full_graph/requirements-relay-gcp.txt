@@ -1,0 +1,2 @@
+# Optional host-side GCP ADC mode only. Never install this into the worker image.
+google-auth==2.62.0

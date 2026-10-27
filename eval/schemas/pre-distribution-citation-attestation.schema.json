@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openshell-deep-research.invalid/eval/v1/pre-distribution-citation-attestation.schema.json",
+  "title": "Restricted pre-distribution candidate citation attestation",
+  "description": "Binding-only control object. Its detached signature covers the domain prefix plus exact JSON bytes. The 32 KiB raw-byte limit, strict JSON integer spelling, and independent key/input approval are enforced by the runtime or external controls, not JSON Schema alone; this object cannot authorize packet delivery.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "attestation_type",
+    "candidate_id",
+    "case_id",
+    "run_id",
+    "packet_id",
+    "packet_sha256",
+    "packet_manifest_sha256",
+    "corpus_digest",
+    "source_pack_digest",
+    "rubric_digest",
+    "original_artifact_sha256",
+    "extraction_record_sha256",
+    "citation_count",
+    "citation_spans_sha256",
+    "decision",
+    "control_reviewer_id",
+    "submission_time_ref"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "attestation_type": {"const": "pre_distribution_citation_attestation"},
+    "candidate_id": {"$ref": "#/$defs/id"},
+    "case_id": {"$ref": "#/$defs/id"},
+    "run_id": {"$ref": "#/$defs/id"},
+    "packet_id": {"type": "string", "pattern": "^bp-[0-9a-f]{32}(?![\\s\\S])"},
+    "packet_sha256": {"$ref": "#/$defs/digest"},
+    "packet_manifest_sha256": {"$ref": "#/$defs/digest"},
+    "corpus_digest": {"$ref": "#/$defs/digest"},
+    "source_pack_digest": {"$ref": "#/$defs/digest"},
+    "rubric_digest": {"$ref": "#/$defs/digest"},
+    "original_artifact_sha256": {"$ref": "#/$defs/digest"},
+    "extraction_record_sha256": {"$ref": "#/$defs/digest"},
+    "citation_count": {"type": "integer", "minimum": 0, "maximum": 32},
+    "citation_spans_sha256": {"$ref": "#/$defs/digest"},
+    "decision": {"enum": ["corroborated", "blocked"]},
+    "control_reviewer_id": {"$ref": "#/$defs/id"},
+    "submission_time_ref": {"type": "string", "minLength": 1, "maxLength": 512, "pattern": "\\S"},
+    "reason": {"type": "string", "minLength": 1, "maxLength": 2048, "pattern": "\\S"}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}(?![\\s\\S])"},
+    "digest": {"type": "string", "pattern": "^[0-9a-f]{64}(?![\\s\\S])"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"decision": {"const": "blocked"}}, "required": ["decision"]},
+      "then": {"required": ["reason"]},
+      "else": {"not": {"required": ["reason"]}}
+    }
+  ]
+}

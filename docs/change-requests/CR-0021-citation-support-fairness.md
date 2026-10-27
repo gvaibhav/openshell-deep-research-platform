@@ -1,0 +1,41 @@
+# CR-0021: Accept semantically supported alternative citation spans
+
+- **ID:** CR-0021
+- **Status:** In progress
+- **Impact ID:** DR-FEAS-004
+- **Phase:** Milestone 0, before human corpus approval or observed scoring
+- **Accountable team:** Research evaluation and product owner (proposed)
+- **Component paths:** `eval/target_projection.py`, `eval/scorecard.py`, `eval/blind_review/`, `eval/schemas/`, `eval/tests/`, `Makefile`, `eval/README.md`, `docs/feasibility-and-market-assessment.md`
+- **Requirement IDs:** SEL-01, SEL-05, RES-09
+- **Primary design:** [Milestone 0 implementation intake](../design/implementation-plan.md#6-milestone-0-implementation-intake)
+- **Detailed impact analysis:** [Matched-pilot fairness impact](../feasibility-and-market-assessment.md#matched-evaluation-fairness-and-observation-impact)
+- **Proposed component design:** [v3 matched-evaluation observation contract](../design/matched-evaluation-contract-v3.md)
+- **Independent design review:** [Ranked handoff findings](../evidence/CR-0021-0022-v3-design-independent-review-2026-10-26.md)
+- **Isolated helper code review:** [Target-projection review](../evidence/CR-0021-target-projection-independent-review-2026-10-26.md)
+- **Parent:** [CR-0011](CR-0011-matched-feasibility-evaluation.md) / [ToDo](../todos/CR-0011-matched-feasibility-evaluation.md)
+- **Paired ToDo:** [Implementation and proof checklist](../todos/CR-0021-citation-support-fairness.md)
+
+## Impact and decision
+
+The draft scorer treats every preregistered exact quote as the only acceptable candidate citation string. In synthetic case-12, a full-document citation to `github-deploy-77` can support both facts but fail both shorter exact-string checks. That can give a valid answer zero and bias the matched platform decision. The [independent corpus review](../evidence/CR-0011-corpus-readiness-review-2026-10-26.md) identified this as a scoring Blocker. This changes the evaluation contract, not a production source authorization or worker trust boundary. Data class is synthetic/public; expected facts and anchors stay evaluator-only.
+
+The target treats preregistered quote strings as reviewer anchors, not mandatory answer strings. A deterministic **reviewer-only target projection**, derived from approved corpus/source bytes and the exact packet, exposes only target index, permitted evidence ID, and anchor quote; it excludes candidate labels, forbidden IDs/text, sentinels, and control claims. Each signed blind review binds its projection digest. The scorer verifies that each actual citation names a permitted evidence ID and its quote is an exact span of that approved source snapshot. One signed, blinded human quality review explicitly records whether each required support target is supported by a cited span and identifies that citation. The reviewer can accept a longer or different source-linked span with a recorded rationale; an unrelated quote, missing source, or unsupported fact receives no credit. The signed scorer binding carries those structured decisions unchanged through concealed assembly and control review. Expected evidence IDs still constrain source-family coverage. An unsupported required target forces effective quality zero regardless of numeric scores. The machine does not infer semantics. [CR-0024](CR-0024-blind-packet-answer-integrity.md) / [ToDo](../todos/CR-0024-blind-packet-answer-integrity.md) separately requires the packet answer to equal the raw candidate answer before any blind scoring.
+
+Current v1 blind-review entries carry a reviewer ID but no reviewer-authenticated signature; a witness signature freezes their bytes without proving who authored a support finding. The proposed v2 entry therefore has a bounded domain-separated signature over packet/hash, target-projection digest, reviewer/time, scores, support findings, and notes. A separately approved and SHA-pinned reviewer-key register supplies accepted RSA SHA-256 key, validity, and role; the same key cannot sign control review or witness receipt. Verify each entry before control/witness freeze and again at scorer binding. The witness v4 freezes the signed entries and register digest. Workbench delivery logs, trusted submission time, signer independence, and an independent semantic sample remain external gates. The [detailed contract](../design/matched-evaluation-contract-v3.md#citation-support-decision) specifies the encoding and denied cases.
+
+## Accepted and denied behavior
+
+The projection is capped at 128 targets and 128 KiB of encoded bytes, with no truncation. Independently pinned raw approval hashes and matching canonical digests from the **pre-distribution control-attested manifest** are both required; the isolated derivation must be fed the exact packet bytes from a held directory FD after the preliminary signature and manifest/packet identities are verified. The later witness receipt cannot authorize a target already delivered. Oversize, absent raw approval, missing/changed preliminary attestation, or inconsistent digest denies delivery. The [proposed contract](../design/matched-evaluation-contract-v3.md#citation-support-decision) owns these limits; the paired ToDo owns their tests.
+
+The eventual distributor must feed **the same immutable verified packet bytes** to target derivation and reviewer delivery, with no pathname reopen or reserialization. The reviewer edge compares the raw SHA-256 and packet ID of the bytes it actually received to the independently attested values before display. A swapped or label-bearing delivered packet denies even if the earlier derivation for packet A was valid. The isolated helper does not implement this distributor or edge check.
+
+- **Accept:** A full-document quote from the approved `github-deploy-77` snapshot may support both case-12 targets when a blind reviewer signs affirmative, specific support findings, although neither short anchor exactly equals the candidate quote.
+- **Deny:** A quote absent from the source snapshot; an unallowed or forbidden source ID; a same-source quote that does not support the fact and is marked unsupported; a leaked or stale reviewer target projection; a missing, unsigned, wrong-key, expired-key, or wrong-projection support finding; a custodian-forged reviewer ID or `supported: true` before witness freeze; a reviewer key reused for control/witness signing; a finding changed after freeze; or a claim that a source ID alone proves semantic support. Case/category citation, permission, and injection constraints remain in force.
+
+## Risk, dependencies, and disable path
+
+A permissive source-ID check alone could turn unrelated text into apparent support. A witness signature on a custodian-controlled review file alone could attribute invented support to a named human. The reviewer-authenticated entry must contain the explicit support mapping and target-projection digest; external submission evidence and independent review check its attribution and semantics on the approved pack. [CR-0025](CR-0025-candidate-citation-provenance.md) / [ToDo](../todos/CR-0025-candidate-citation-provenance.md) separately proves the candidate originally cited the material before a blind reviewer judges support. Version the changed review, reviewer-key register, candidate-run, raw/map, control, receipt/assembly, and scorecard artifacts together; the existing packet-manifest v2 and scorer-binding path-catalog v2 shapes may remain only if the verifier rejects older **referenced** artifacts and mixed versions. Case/source schemas stay v1 and rubric values/digest change before approval. Implement after CR-0011 signed packet-directory binding and CR-0024 raw/packet equality stabilize. Until allow/deny tests and independent review pass, withhold corpus approval and SEL scoring. A corrected rubric or input after candidate runs requires a new approved version and rerun of affected arms.
+
+## Closure gate
+
+The paired ToDo records the supported alternative-span **red** test, unrelated same-source **regression guard**, target-projection leak/stale-digest and signed-mapping denial, complete signed scoring, schema versions, local checks, independent review, and human corpus approval separately. Keep this pair open until component behavior is proven; a design edit alone is not proof.
