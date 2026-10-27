@@ -366,6 +366,12 @@ The [complete CR/ToDo index](TODO.md) includes deferred source paths and later e
 
 | 2026-10-26 | First draft PR CI observed; portable-link correction | Root agent | [Run 40456775776](https://github.com/gvaibhav/openshell-deep-research-platform/actions/runs/40456775776) at `2c8759c` passed secret, exact-lock CVE/KEV, and configuration scans. Quality failed at `make check` on two historical Mac-absolute evidence links; root changed them to relative links and is rerunning. No branch protection or release qualification is claimed. |
 
+| 2026-10-26 | Checkpoint portability re-review assigned | `/root/checkpoint_review` | Read-only recheck of relative historical evidence links and five binding tests that assumed Mac `/private/tmp`. Root is using canonical system `/tmp` and explicit root-owned/sticky positive assertions so Linux exercises the same custody boundary; no authorization code changes. First CI rerun and focused binding tests are pending. |
+
+| 2026-10-26 | CR-0022 independent read-only review assigned | `/root/cost_export_review` | Reviewer is reading the unchanged cost/export target and bounded helper scope under SEL-01/05 and RES-09; final code probes wait for the implementer’s green handoff. Review will check unknown/zero and full-matrix accounting, export truth table, artifact/corroboration binding, and explicit external-proof limits. |
+
+| 2026-10-26 | Independent checkpoint portability review returned | `/root/checkpoint_review` and root agent | Reviewer found no scoped Blocker/Important, independently passed the five affected tests, and observed canonical `/private/tmp` owned by UID 0 with mode 01777. Root passed all 72 binding tests plus lint/format. Relative evidence links preserve historical content; Linux proof awaits CI on the committed correction. No production policy changed. |
+
 ## Next update rule
 
 Record an entry here and send a short chat update whenever a task is assigned to a sub-agent, a sub-agent returns, or an independent reviewer begins or returns. Record red/green TDD evidence and unrun live gates against the owning ToDo before marking a CR verified.

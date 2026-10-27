@@ -29,6 +29,7 @@ from eval.tests.test_scorecard import fixture_inputs
 
 ROOT = Path(__file__).resolve().parents[1]
 OPENSSL = Path(shutil.which("openssl") or "/usr/bin/openssl")
+SYSTEM_TMP = Path("/tmp").resolve(strict=True)
 
 
 def file_hash(path: Path) -> str:
@@ -1482,7 +1483,7 @@ class SignedBindingTests(unittest.TestCase):
         private_parent = operator_root / "private"
         private_parent.mkdir(parents=True, mode=0o700)
         with tempfile.TemporaryDirectory(
-            prefix="cr0011-consumer-route-", dir="/private/tmp"
+            prefix="cr0011-consumer-route-", dir=SYSTEM_TMP
         ) as public_name:
             public_root = Path(public_name)
             public_root.chmod(0o777)
@@ -1512,7 +1513,7 @@ class SignedBindingTests(unittest.TestCase):
     ) -> None:
         f = self.fixture
         with tempfile.TemporaryDirectory(
-            prefix="cr0011-public-parent-", dir="/private/tmp"
+            prefix="cr0011-public-parent-", dir=SYSTEM_TMP
         ) as shared_name:
             shared = Path(shared_name)
             shared.chmod(0o777)
@@ -1534,9 +1535,12 @@ class SignedBindingTests(unittest.TestCase):
             self.assertEqual(list(retired_private.glob(".scorecard-*.tmp")), [])
 
     def test_root_owned_sticky_temp_parent_allows_private_fresh_output(self) -> None:
+        parent_stat = SYSTEM_TMP.stat()
+        self.assertEqual(parent_stat.st_uid, 0)
+        self.assertTrue(parent_stat.st_mode & stat.S_ISVTX)
         f = self.fixture
         with tempfile.TemporaryDirectory(
-            prefix="cr0011-private-output-", dir="/private/tmp"
+            prefix="cr0011-private-output-", dir=SYSTEM_TMP
         ) as private_name:
             target = Path(private_name).resolve(strict=True) / "scorecard.json"
             output, errors = io.StringIO(), io.StringIO()
@@ -1555,7 +1559,7 @@ class SignedBindingTests(unittest.TestCase):
     ) -> None:
         f = self.fixture
         with tempfile.TemporaryDirectory(
-            prefix="cr0011-untrusted-owner-", dir="/private/tmp"
+            prefix="cr0011-untrusted-owner-", dir=SYSTEM_TMP
         ) as outer_name:
             outer = Path(outer_name).resolve(strict=True)
             outer.chmod(0o755)
@@ -2198,7 +2202,7 @@ class SignedBindingTests(unittest.TestCase):
     ) -> None:
         f = self.fixture
         with tempfile.TemporaryDirectory(
-            prefix="cr0011-public-output-", dir="/private/tmp"
+            prefix="cr0011-public-output-", dir=SYSTEM_TMP
         ) as public_name:
             public_root = Path(public_name)
             public_parent = public_root / "real"
