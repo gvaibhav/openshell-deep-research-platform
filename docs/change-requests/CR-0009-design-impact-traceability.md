@@ -30,4 +30,4 @@ A passing structural check can create false confidence if reviewers do not ident
 
 ## Dependency and closure gate
 
-The current repository has no protected CI pipeline. The local validator and linked pair records can be reviewed now, but this CR remains `Open` until protected CI runs the check before executable code is merged and the paired ToDo records positive and negative check evidence plus review disposition. Preserve the links after verification or withdrawal.
+Versioned CI workflows now exist, but the repository has no protected CI enforcement or qualifying run evidence. The [checkpoint handoff](../handoffs/milestone0-protected-ci-checkpoint.md) records the required owner steps. The local validator and linked pair records can be reviewed now, but this CR remains `Open` until protected CI runs the check before executable code is merged and the paired ToDo records positive and negative check evidence plus review disposition. Preserve the links after verification or withdrawal.

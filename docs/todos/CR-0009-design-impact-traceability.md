@@ -21,7 +21,7 @@
 
 ## Completion evidence
 
-- **Pull request and artifact versions:** Pending; repository changes are not yet merged and no CI pipeline exists.
+- **Pull request and artifact versions:** Draft workflow exists; repository changes are not merged and protected enforcement remains absent. The [checkpoint handoff](../handoffs/milestone0-protected-ci-checkpoint.md) records current local checks, secret review, and the exact required-check owner path.
 - **Accepted and denied cases:** Use the [CR required behavior](../change-requests/CR-0009-design-impact-traceability.md#required-behavior) as the criterion. A temporary one-pair repository fixture passed with zero errors; mismatched status, missing index backlink, invalid status, and orphaned CR fixtures each produced the expected validator error on 2026-10-23. The invalid-status case produced errors for both files.
 - **Local check:** `make check` passed on 2026-10-23: 16 JSON Schemas, 21 examples, 11 OpenAPI operations, 53 Markdown files, 102 Mermaid fences, and 9 CR/ToDo pairs. `git diff HEAD --check` passed. A read-only principal engineer review of the current design/workflow diff reported no Blocker or Important findings; its remaining gates are protected CI and a first implementation-PR demonstration.
 - **Protected CI and implementation intake:** Pending before the first executable build.
