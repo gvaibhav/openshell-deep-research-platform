@@ -1,0 +1,178 @@
+{
+  "candidates": [
+    {
+      "kind": "regular",
+      "path": "/usr/local/lib/python3.13/site-packages/anthropic/_vendor/__init__.py",
+      "reason": "vendored_file",
+      "sha256": "efe3ba16878d9091cb8b46f5ac4a513e81891a7e593eedb79a1328a852416eea",
+      "size": 341
+    },
+    {
+      "kind": "regular",
+      "path": "/usr/local/lib/python3.13/site-packages/anthropic/_vendor/__pycache__/__init__.cpython-313.pyc",
+      "reason": "vendored_file",
+      "sha256": "05651ef832fb7ce2330c60dbf436809b2dab06f8302eaae0c3b3fefe8a0b46dc",
+      "size": 520
+    },
+    {
+      "kind": "regular",
+      "path": "/usr/local/lib/python3.13/site-packages/anthropic/_vendor/httpx_aiohttp/LICENSE",
+      "reason": "vendored_file",
+      "sha256": "154759c1e9eb58e42643ee43ec59d556def4d1d702d911a484c469e02f85dd5d",
+      "size": 1493
+    },
+    {
+      "kind": "regular",
+      "path": "/usr/local/lib/python3.13/site-packages/anthropic/_vendor/httpx_aiohttp/NOTICE.md",
+      "reason": "vendored_file",
+      "sha256": "90f45e20cf0b5c730d956ad93d3cd68ab4466b9c7490ac2a1999c8dcbd521562",
+      "size": 1705
+    },
+    {
+      "kind": "regular",
+      "path": "/usr/local/lib/python3.13/site-packages/anthropic/_vendor/httpx_aiohttp/__init__.py",
+      "reason": "vendored_file",
+      "sha256": "3296ae529f8e9bb3fd48615144aae1bb8a3190cc6cabe251bf9c5a88572118c9",
+      "size": 646
+    },
+    {
+      "kind": "regular",
+      "path": "/usr/local/lib/python3.13/site-packages/anthropic/_vendor/httpx_aiohttp/__pycache__/__init__.cpython-313.pyc",
+      "reason": "vendored_file",
+      "sha256": "f9ad784eb6a14eb0dd18366d995b69a46eb7dc8b09d3a59a0be88ee9c05f99b5",
+      "size": 506
+    },
+    {
+      "kind": "regular",
+      "path": "/usr/local/lib/python3.13/site-packages/anthropic/_vendor/httpx_aiohttp/__pycache__/client.cpython-313.pyc",
+      "reason": "vendored_file",
+      "sha256": "ade426e743618a4e5748f7ad06d35da0136cf2b5dd293316313d669e6718bb66",
+      "size": 2413
+    },
+    {
+      "kind": "regular",
+      "path": "/usr/local/lib/python3.13/site-packages/anthropic/_vendor/httpx_aiohttp/__pycache__/transport.cpython-313.pyc",
+      "reason": "vendored_file",
+      "sha256": "c107fb66f192f01c4537b52abcbdec8d5dab6d6f54ccb443982bf5c665e7cd79",
+      "size": 10426
+    },
+    {
+      "kind": "regular",
+      "path": "/usr/local/lib/python3.13/site-packages/anthropic/_vendor/httpx_aiohttp/client.py",
+      "reason": "vendored_file",
+      "sha256": "f898d0484ea1a781df18dbff5b305a6a53289f331ad0593f2fdf5a573a10e718",
+      "size": 2144
+    },
+    {
+      "kind": "regular",
+      "path": "/usr/local/lib/python3.13/site-packages/anthropic/_vendor/httpx_aiohttp/transport.py",
+      "reason": "vendored_file",
+      "sha256": "5f86968a043abd20a1e5b6f6db23ed70d1506051dafb53017125298e2893bdb2",
+      "size": 7451
+    },
+    {
+      "kind": "regular",
+      "path": "/usr/local/lib/python3.13/site-packages/openai/_vendor/__init__.py",
+      "reason": "vendored_file",
+      "sha256": "8af5c4061a2d7158edf243273e4fe6787832e4cba8e99ff999f01654b6803b90",
+      "size": 85
+    },
+    {
+      "kind": "regular",
+      "path": "/usr/local/lib/python3.13/site-packages/openai/_vendor/__pycache__/__init__.cpython-313.pyc",
+      "reason": "vendored_file",
+      "sha256": "f2a46f97d959abb08d068d3540e191c16c46bfcfe0de16056c64a0dcc858a39c",
+      "size": 256
+    },
+    {
+      "kind": "regular",
+      "path": "/usr/local/lib/python3.13/site-packages/openai/_vendor/httpx_aiohttp/FORK.md",
+      "reason": "vendored_file",
+      "sha256": "672063738ed96ec5ff9553a18d0a1a371ecfd3156a712deb74aee9bf57d81ea2",
+      "size": 1109
+    },
+    {
+      "kind": "regular",
+      "path": "/usr/local/lib/python3.13/site-packages/openai/_vendor/httpx_aiohttp/LICENSE",
+      "reason": "vendored_file",
+      "sha256": "154759c1e9eb58e42643ee43ec59d556def4d1d702d911a484c469e02f85dd5d",
+      "size": 1493
+    },
+    {
+      "kind": "regular",
+      "path": "/usr/local/lib/python3.13/site-packages/openai/_vendor/httpx_aiohttp/README.md",
+      "reason": "vendored_file",
+      "sha256": "6a45d8bdc1e377fecc6c122b3ca586cabb0bd595b3c1505e6cc5f0af85d7af7b",
+      "size": 834
+    },
+    {
+      "kind": "regular",
+      "path": "/usr/local/lib/python3.13/site-packages/openai/_vendor/httpx_aiohttp/__init__.py",
+      "reason": "vendored_file",
+      "sha256": "f1925ca049c372847b66b7842408ba7dd603751ccf07a3af97cc19e1f4a72aa5",
+      "size": 305
+    },
+    {
+      "kind": "regular",
+      "path": "/usr/local/lib/python3.13/site-packages/openai/_vendor/httpx_aiohttp/__pycache__/__init__.cpython-313.pyc",
+      "reason": "vendored_file",
+      "sha256": "54df7670743988e75c19d37147a87efa361ea142fcd83ab7feaed48f89064f2f",
+      "size": 503
+    },
+    {
+      "kind": "regular",
+      "path": "/usr/local/lib/python3.13/site-packages/openai/_vendor/httpx_aiohttp/__pycache__/client.cpython-313.pyc",
+      "reason": "vendored_file",
+      "sha256": "262ead558b706104afa755df1496bcffea8ca839e20d42c74122db830586a3eb",
+      "size": 2413
+    },
+    {
+      "kind": "regular",
+      "path": "/usr/local/lib/python3.13/site-packages/openai/_vendor/httpx_aiohttp/__pycache__/transport.cpython-313.pyc",
+      "reason": "vendored_file",
+      "sha256": "72d41299fef1348d7df73bc6b3ddb0960b5ac317d385d94a31fcf73bfe64637a",
+      "size": 10407
+    },
+    {
+      "kind": "regular",
+      "path": "/usr/local/lib/python3.13/site-packages/openai/_vendor/httpx_aiohttp/client.py",
+      "reason": "vendored_file",
+      "sha256": "c7f6cb750732322ef8bbc18ae129d74076e45b0245ebfb09ce2425d2b1461fa8",
+      "size": 1805
+    },
+    {
+      "kind": "regular",
+      "path": "/usr/local/lib/python3.13/site-packages/openai/_vendor/httpx_aiohttp/transport.py",
+      "reason": "vendored_file",
+      "sha256": "cedf17fbf57ea242c36d141690e39b944162c9a84f1fdfb1cb194d698e32cc40",
+      "size": 7121
+    }
+  ],
+  "captured_at": "2026-10-26T19:42:30.690557+00:00",
+  "complete": true,
+  "container_image_id": "sha256:8548ebaf60475d442eb8dae16b1b414a66283f68ec369af2ed4f2e7f49be1292",
+  "entries_seen": 20520,
+  "export_bytes": 292227584,
+  "export_sha256": "84039e5c2bd9e2658be782e595bb1baab5b654da1007b57549d2c3c5b869cd5e",
+  "observed_architecture": "arm64",
+  "observed_os": "linux",
+  "platform": "linux/arm64",
+  "ref": "localhost/openshell-research-spike@sha256:8548ebaf60475d442eb8dae16b1b414a66283f68ec369af2ed4f2e7f49be1292",
+  "regular_files_seen": 18262,
+  "resolved_descriptor_digest": "sha256:5feb045b50a621868448115b70e9deae50fbaa376708c87e69e46efba6ac6b99",
+  "resolved_image_id": "sha256:5feb045b50a621868448115b70e9deae50fbaa376708c87e69e46efba6ac6b99",
+  "rootfs_diff_ids": [
+    "sha256:e5593b7179d10a64cfe451e886e3ab13ccd476f906dc670865322ae1dbdf969f",
+    "sha256:8da418d5403ab69a387291997a318d587a8ee9ece1e9a5d9a9c0b24d6054b1f2",
+    "sha256:6c7bd5da7ecb180c58574ee86868cb65aa3bde3c9adf5156a1adb984c42a7002",
+    "sha256:3ebbad4973ad93b203d2ff655ad2b21a744dc50bb0fad88e1d2f41f50ec5888b",
+    "sha256:a2636c2acb2cb95ceea3904e11ef3c264c5ccd742c2f489e67463dbeae69dded",
+    "sha256:a979119e576f6599990e550cfaa346cd83c1093475ab616cdf677133be238570",
+    "sha256:4b6d2764978f5caebba7516c3fa06cc7c15cff75c50f2e5f0f83bd4fde9a5bae",
+    "sha256:814e31e608f95e207ed75da46cd9c024108ff0c11354def85e22c8132af98dcd",
+    "sha256:d6bbefb60f2dce01d3d60a56e14c144dd34af74722fc37de40f4263dcca2e641",
+    "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef"
+  ],
+  "schema_version": 2,
+  "source": "docker-container-export"
+}

@@ -1,0 +1,16 @@
+{
+  "schema_version": 2,
+  "approved_corpus_path": "/approved/cases.json",
+  "approved_sources_path": "/approved/sources.json",
+  "approved_rubric_path": "/approved/rubric.json",
+  "raw_observations_path": "/restricted/raw-observations.json",
+  "packet_directory": "/review/packets-001",
+  "candidate_map_path": "/restricted/blind-001/candidate-map.json",
+  "blind_reviews_path": "/review/blind-reviews.json",
+  "witness_receipt_path": "/witness/receipt.json",
+  "witness_signature_path": "/witness/receipt.sig",
+  "witness_public_key_path": "/witness/witness-public.pem",
+  "control_review_path": "/control/control-review.json",
+  "control_signature_path": "/control/control-review.sig",
+  "control_public_key_path": "/control/control-public.pem"
+}

@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openshell-deep-research.invalid/eval/v1/reviewer-target-projection.schema.json",
+  "title": "Reviewer-only citation target projection",
+  "description": "Derived from independently approved corpus/source bytes and a separately attested packet; never shown to a candidate or tester.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "corpus_digest", "source_pack_digest", "packet_id", "packet_sha256", "case_id", "targets"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "corpus_digest": {"$ref": "#/$defs/digest"},
+    "source_pack_digest": {"$ref": "#/$defs/digest"},
+    "packet_id": {"type": "string", "pattern": "^bp-[0-9a-f]{32}$"},
+    "packet_sha256": {"$ref": "#/$defs/digest"},
+    "case_id": {"$ref": "#/$defs/id"},
+    "targets": {
+      "type": "array",
+      "maxItems": 128,
+      "items": {"$ref": "#/$defs/target"}
+    }
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["target_index", "evidence_id", "anchor_quote"],
+      "properties": {
+        "target_index": {"type": "integer", "minimum": 0, "maximum": 127},
+        "evidence_id": {"$ref": "#/$defs/id"},
+        "anchor_quote": {"type": "string", "minLength": 1, "maxLength": 4096}
+      }
+    }
+  }
+}

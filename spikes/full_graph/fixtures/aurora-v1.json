@@ -1,0 +1,21 @@
+{
+  "fixture_id": "aurora-v1",
+  "data_class": "synthetic",
+  "sources": [
+    {
+      "source_id": "ownership",
+      "uri": "fixture://aurora/ownership",
+      "text": "Team Atlas owns Project Aurora. Ownership was recorded on 2026-01-15."
+    },
+    {
+      "source_id": "runbook",
+      "uri": "fixture://aurora/runbook",
+      "text": "The Aurora runbook took effect on 2026-02-01. It covers research review and incident routing."
+    },
+    {
+      "source_id": "decoy",
+      "uri": "fixture://aurora/decoy",
+      "text": "Project Nebula is owned by Team Cedar. This record says nothing about Aurora."
+    }
+  ]
+}

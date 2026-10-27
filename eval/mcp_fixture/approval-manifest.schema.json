@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openshell-deep-research.invalid/eval/mcp-fixture/approval-manifest-v1.schema.json",
+  "title": "Externally pinned synthetic case distribution manifest",
+  "description": "An external approved register must supply the exact SHA-256 of these manifest bytes. In-file approval fields or a caller-generated replacement digest alone are not approval.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "approval",
+    "data_use_destination",
+    "corpus_sha256",
+    "sources_sha256",
+    "rubric_sha256",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "reviewer_id", "reviewed_at", "approval_ref"],
+      "properties": {
+        "status": {"const": "approved"},
+        "reviewer_id": {"type": "string", "minLength": 1, "maxLength": 200},
+        "reviewed_at": {"type": "string", "format": "date-time"},
+        "approval_ref": {"type": "string", "minLength": 1, "maxLength": 200}
+      }
+    },
+    "data_use_destination": {"const": "chatgpt_enterprise"},
+    "corpus_sha256": {"$ref": "#/$defs/digest"},
+    "sources_sha256": {"$ref": "#/$defs/digest"},
+    "rubric_sha256": {"$ref": "#/$defs/digest"},
+    "cases": {
+      "type": "array",
+      "minItems": 24,
+      "maxItems": 24,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["case_id", "question_sha256", "projection_sha256"],
+        "properties": {
+          "case_id": {"type": "string", "pattern": "^case-(0[1-9]|1[0-9]|2[0-4])$"},
+          "question_sha256": {"$ref": "#/$defs/digest"},
+          "projection_sha256": {"$ref": "#/$defs/digest"}
+        }
+      },
+      "allOf": [
+        {"contains": {"properties": {"case_id": {"const": "case-01"}}, "required": ["case_id"]}, "minContains": 1, "maxContains": 1},
+        {"contains": {"properties": {"case_id": {"const": "case-02"}}, "required": ["case_id"]}, "minContains": 1, "maxContains": 1},
+        {"contains": {"properties": {"case_id": {"const": "case-03"}}, "required": ["case_id"]}, "minContains": 1, "maxContains": 1},
+        {"contains": {"properties": {"case_id": {"const": "case-04"}}, "required": ["case_id"]}, "minContains": 1, "maxContains": 1},
+        {"contains": {"properties": {"case_id": {"const": "case-05"}}, "required": ["case_id"]}, "minContains": 1, "maxContains": 1},
+        {"contains": {"properties": {"case_id": {"const": "case-06"}}, "required": ["case_id"]}, "minContains": 1, "maxContains": 1},
+        {"contains": {"properties": {"case_id": {"const": "case-07"}}, "required": ["case_id"]}, "minContains": 1, "maxContains": 1},
+        {"contains": {"properties": {"case_id": {"const": "case-08"}}, "required": ["case_id"]}, "minContains": 1, "maxContains": 1},
+        {"contains": {"properties": {"case_id": {"const": "case-09"}}, "required": ["case_id"]}, "minContains": 1, "maxContains": 1},
+        {"contains": {"properties": {"case_id": {"const": "case-10"}}, "required": ["case_id"]}, "minContains": 1, "maxContains": 1},
+        {"contains": {"properties": {"case_id": {"const": "case-11"}}, "required": ["case_id"]}, "minContains": 1, "maxContains": 1},
+        {"contains": {"properties": {"case_id": {"const": "case-12"}}, "required": ["case_id"]}, "minContains": 1, "maxContains": 1},
+        {"contains": {"properties": {"case_id": {"const": "case-13"}}, "required": ["case_id"]}, "minContains": 1, "maxContains": 1},
+        {"contains": {"properties": {"case_id": {"const": "case-14"}}, "required": ["case_id"]}, "minContains": 1, "maxContains": 1},
+        {"contains": {"properties": {"case_id": {"const": "case-15"}}, "required": ["case_id"]}, "minContains": 1, "maxContains": 1},
+        {"contains": {"properties": {"case_id": {"const": "case-16"}}, "required": ["case_id"]}, "minContains": 1, "maxContains": 1},
+        {"contains": {"properties": {"case_id": {"const": "case-17"}}, "required": ["case_id"]}, "minContains": 1, "maxContains": 1},
+        {"contains": {"properties": {"case_id": {"const": "case-18"}}, "required": ["case_id"]}, "minContains": 1, "maxContains": 1},
+        {"contains": {"properties": {"case_id": {"const": "case-19"}}, "required": ["case_id"]}, "minContains": 1, "maxContains": 1},
+        {"contains": {"properties": {"case_id": {"const": "case-20"}}, "required": ["case_id"]}, "minContains": 1, "maxContains": 1},
+        {"contains": {"properties": {"case_id": {"const": "case-21"}}, "required": ["case_id"]}, "minContains": 1, "maxContains": 1},
+        {"contains": {"properties": {"case_id": {"const": "case-22"}}, "required": ["case_id"]}, "minContains": 1, "maxContains": 1},
+        {"contains": {"properties": {"case_id": {"const": "case-23"}}, "required": ["case_id"]}, "minContains": 1, "maxContains": 1},
+        {"contains": {"properties": {"case_id": {"const": "case-24"}}, "required": ["case_id"]}, "minContains": 1, "maxContains": 1}
+      ]
+    }
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

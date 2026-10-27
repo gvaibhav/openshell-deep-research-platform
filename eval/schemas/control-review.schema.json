@@ -1,0 +1,143 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openshell-deep-research.invalid/eval/v2/control-review.schema.json",
+  "title": "Independent matched-run control review",
+  "description": "A detached signature covers the exact UTF-8 file bytes. Schema validity does not establish independent custody or source-event truth.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "approval", "packet_manifest_sha256",
+    "candidate_map_sha256", "blind_reviews_sha256", "raw_observations_sha256",
+    "candidate_run_digests", "cases"
+  ],
+  "properties": {
+    "schema_version": {"const": 2},
+    "approval": {"$ref": "#/$defs/approval"},
+    "packet_manifest_sha256": {"$ref": "#/$defs/digest"},
+    "candidate_map_sha256": {"$ref": "#/$defs/digest"},
+    "blind_reviews_sha256": {"$ref": "#/$defs/digest"},
+    "raw_observations_sha256": {"$ref": "#/$defs/digest"},
+    "candidate_run_digests": {
+      "type": "object", "additionalProperties": {"$ref": "#/$defs/digest"}
+    },
+    "cases": {"type": "array", "maxItems": 240, "items": {"$ref": "#/$defs/case"}}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "text": {"type": "string", "minLength": 1, "maxLength": 256},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "approval": {
+      "oneOf": [
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["status"], "properties": {"status": {"const": "pending"}}
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["status", "reviewer_id", "reviewed_at", "basis"],
+          "properties": {
+            "status": {"const": "approved"},
+            "reviewer_id": {"$ref": "#/$defs/text"},
+            "reviewed_at": {"$ref": "#/$defs/timestamp"},
+            "basis": {"const": "independently_retained_raw_run_control_and_disposition_evidence"}
+          }
+        }
+      ]
+    },
+    "artifact": {
+      "type": "object", "additionalProperties": false,
+      "required": ["ref", "sha256"],
+      "properties": {
+        "ref": {"$ref": "#/$defs/text"},
+        "sha256": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "probe": {
+      "type": "object", "additionalProperties": false,
+      "required": ["probe_id", "subject_id", "target_evidence_id", "outcome", "observed_at", "evidence_ref"],
+      "properties": {
+        "probe_id": {"$ref": "#/$defs/text"},
+        "subject_id": {"$ref": "#/$defs/text"},
+        "target_evidence_id": {"$ref": "#/$defs/text"},
+        "outcome": {"enum": ["allowed", "denied"]},
+        "observed_at": {"$ref": "#/$defs/timestamp"},
+        "evidence_ref": {"$ref": "#/$defs/text"}
+      }
+    },
+    "acknowledgement": {
+      "type": "object", "additionalProperties": false,
+      "required": ["revocation_id", "subject_id", "target_evidence_id", "status", "acknowledged_at", "evidence_ref"],
+      "properties": {
+        "revocation_id": {"$ref": "#/$defs/text"},
+        "subject_id": {"$ref": "#/$defs/text"},
+        "target_evidence_id": {"$ref": "#/$defs/text"},
+        "status": {"const": "acknowledged"},
+        "acknowledged_at": {"$ref": "#/$defs/timestamp"},
+        "evidence_ref": {"$ref": "#/$defs/text"}
+      }
+    },
+    "permissionEvent": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "observation", "event_sha256"],
+      "properties": {
+        "kind": {"enum": ["forbidden_probe", "allowed_probe", "revocation_pre_probe", "revocation_acknowledgement", "revocation_post_probe"]},
+        "observation": {"oneOf": [{"$ref": "#/$defs/probe"}, {"$ref": "#/$defs/acknowledgement"}]},
+        "event_sha256": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "promptPayload": {
+      "type": "object", "additionalProperties": false,
+      "required": ["source_evidence_id", "delivery", "answer_inspection"],
+      "properties": {
+        "source_evidence_id": {"$ref": "#/$defs/text"},
+        "delivery": {"$ref": "#/$defs/artifact"},
+        "answer_inspection": {"$ref": "#/$defs/artifact"}
+      }
+    },
+    "case": {
+      "oneOf": [
+        {"$ref": "#/$defs/completedCase"},
+        {"$ref": "#/$defs/noncompletedCase"}
+      ]
+    },
+    "completedCase": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "status", "candidate_id", "case_id", "run_id", "observed_behavior",
+        "raw_answer_sha256", "raw_run_artifact", "screening_record",
+        "source_view", "permission_violation", "prompt_injection_violation",
+        "permission_events", "prompt_payload"
+      ],
+      "properties": {
+        "status": {"const": "completed"},
+        "candidate_id": {"$ref": "#/$defs/text"},
+        "case_id": {"$ref": "#/$defs/text"},
+        "run_id": {"$ref": "#/$defs/text"},
+        "observed_behavior": {"enum": ["answer", "abstained", "denied"]},
+        "raw_answer_sha256": {"$ref": "#/$defs/digest"},
+        "raw_run_artifact": {"$ref": "#/$defs/artifact"},
+        "screening_record": {"$ref": "#/$defs/artifact"},
+        "source_view": {"$ref": "#/$defs/artifact"},
+        "permission_violation": {"type": "boolean"},
+        "prompt_injection_violation": {"type": "boolean"},
+        "permission_events": {"type": "array", "maxItems": 5, "items": {"$ref": "#/$defs/permissionEvent"}},
+        "prompt_payload": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/promptPayload"}]}
+      }
+    },
+    "noncompletedCase": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "candidate_id", "case_id", "status", "reason",
+        "disposition_evidence", "control_evidence"
+      ],
+      "properties": {
+        "candidate_id": {"$ref": "#/$defs/text"},
+        "case_id": {"$ref": "#/$defs/text"},
+        "status": {"enum": ["deferred", "failed"]},
+        "reason": {"type": "string", "minLength": 1, "maxLength": 2048},
+        "disposition_evidence": {"$ref": "#/$defs/artifact"},
+        "control_evidence": {"$ref": "#/$defs/artifact"}
+      }
+    }
+  }
+}

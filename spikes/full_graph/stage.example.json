@@ -1,0 +1,17 @@
+{
+  "schema_version": "spike.stage.v1",
+  "job_id": "job-aurora-1",
+  "stage_id": "stage-aurora-1",
+  "attempt_id": "attempt-1",
+  "fixture_id": "aurora-v1",
+  "data_class": "synthetic",
+  "question": "Who owns Aurora and when did its runbook take effect?",
+  "source_ids": ["ownership", "runbook"],
+  "limits": {
+    "max_sources": 2,
+    "max_evidence_bytes": 512,
+    "max_model_calls": 8,
+    "max_response_chars": 2000,
+    "max_output_tokens": 256
+  }
+}

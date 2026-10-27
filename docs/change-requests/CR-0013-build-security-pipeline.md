@@ -1,0 +1,33 @@
+# CR-0013: Enforce build checks and vulnerability coverage
+
+- **ID:** CR-0013
+- **Status:** In progress
+- **Impact ID:** DR-BUILD-002
+- **Phase:** Milestone 0 before executable code merges; exact artifact gate before promotion
+- **Accountable team:** Repository maintainers and security owner (proposed)
+- **Component paths:** `.github/workflows/`, Makefile, `requirements-dev.lock`, `spikes/full_graph/requirements-worker.lock`, `scripts/build_security/`, future application packaging
+- **Requirement IDs:** OPS-10, OPS-12
+- **Primary design:** [Deployment and operations](../design/deployment-and-operations.md)
+- **Detailed design:** [Implementation plan](../design/implementation-plan.md#3-milestones-and-exit-evidence), [delivery workflow](../../AGENTS.md#verification-and-release-evidence)
+- **Paired ToDo:** [Implementation and proof checklist](../todos/CR-0013-build-security-pipeline.md)
+
+## Impact on the build
+
+This is an implementation intake for the existing build-security requirement; intended behavior is unchanged. At intake the repository had `make check` but no protected CI or exact scan coverage. Local workflows, locks, and a validator now exist. An [initial pip-only candidate](../evidence/CR-0013-pip-removal-candidate-2026-10-26.md) hid a nested `ensurepip` wheel from the scan; a [corrected development candidate](../evidence/CR-0013-pip-ensurepip-removal-candidate-2026-10-26.md) removes both build tools from the effective runtime filesystem and retains 44 unresolved Debian highs. Targeted independent re-review found no remaining Blocker or Important issue in that image correction; inherited OCI layers retain the original base-image bytes. A [same-digest local synthetic OpenShell graph and cancellation](../evidence/CR-0012-corrected-image-graph-and-cancel-2026-10-26.md) passed. A [historical v1 stopped-container inventory](../evidence/CR-0013-final-rootfs-archive-inventory-2026-10-26.json) found zero **recognized archive** candidates but missed unpacked vendor trees. Its independent release-gate review reproduced an unattested Docker cleanup risk, missed vendored forms, and inconsistent scan/inventory image IDs. A stricter local v2 rerun has now found 21 retained unpacked files under `anthropic/_vendor` and `openai/_vendor` on the same corrected digest and blocks that image pending removal or reviewed coverage/disposition. The [latest independent review](../evidence/CR-0013-archive-gate-final-review-2026-10-26.md) found an SBOM root image/layer identity gap; a [local TDD correction](../evidence/CR-0013-sbom-root-identity-correction-2026-10-26.md) now checks it; an [independent re-review](../evidence/CR-0013-sbom-root-identity-independent-review-2026-10-26.md) found no remaining scoped local issue. A protected CI run, complete final-image evidence, and deployed-digest rescan remain unproved. A passing document or unit check cannot be treated as vulnerability coverage.
+
+## Change request
+
+Add a fail-closed pull-request build for document/contracts, formatting/types/tests, secret scanning, and resolved direct/transitive/development/build dependency CVEs. Build immutable spike images and scan their exact final digests plus every OpenShell gateway/supervisor/runtime image actually used, and Agent Sandbox controller where applicable; generate a digest-linked CycloneDX or SPDX SBOM for each. A multi-platform digest must be scanned for **each deployed OS/architecture**, not merely the CI runner's selected child manifest. The observed image configuration and SBOM must identify that exact digest/platform, and the worker's final Python inventory and SBOM must include every exact package/version from the reviewed hash lock. Inventory embedded installable archives and vendored package manifests: remove build-only copies or scan/disposition their extracted contents under the exact final digest. Trivy's ordinary package/SBOM comparison missed a nested `ensurepip` wheel in the local candidate. Require cross-artifact package and digest consistency, complete KEV catalog and declared count, scanner version, advisory-database timestamp, coverage, and finding dispositions. Reject a missing/stale/incomplete scan or unresolved policy-blocking finding before artifact promotion, using security-owner-approved thresholds/exceptions; medium/low findings need an owner and due date. Make `make check` run in protected CI to advance [CR-0009](CR-0009-design-impact-traceability.md). Add a deployed-digest rescan path before any deployment is called qualified.
+
+## Required behavior
+
+- **Accept:** The versioned CI workflow runs the same repository checks locally and in a protected pull request; resolved package locks and each built/qualified image digest/**deployed platform** have a scan and matching digest/platform-linked SBOM. The worker scan and SBOM both cover its locked Python package inventory, while a separate final-filesystem archive inventory proves no unscanned installable wheel/vendor code remains. A complete KEV feed and approved finding disposition are recorded; the release record names exact images and evidence.
+- **Deny:** A missing dependency lock, missing or wrong digest/platform or SBOM package, inconsistent Trivy image/config ID, ordered rootfs DiffIDs between scan and Docker inventory, or mismatched CycloneDX root ImageID/DiffID **multiset** versus that same observed child, mismatched worker lock, unscanned nested wheel/archive or unpacked vendored source/manifest, stale/truncated KEV or scan, unscanned OpenShell runtime image, secret canary, failing test, or applicable policy-blocking CVE stops merge or promotion at its respective gate. Docker cleanup may remove only a container whose identity/ownership was independently attested; a stdout/CID-file mismatch must fail without deleting an unrelated ID. A misconfiguration scan cannot be substituted for a CVE scan.
+
+## Risk and disable path
+
+The primary risk is a green CI result with partial coverage. Keep absent images/gateways visibly pending and do not mark this CR verified until the relevant exact digests have been scanned. If a scanner is unavailable, fail promotion and keep the artifact local; do not silently skip or issue blanket ignores. Change exception policy only through the security owner and a reviewed record.
+
+## Dependency and closure gate
+
+CI/test scripts can be built before image digests and protected-branch settings are available. Keep this CR `In progress` until a protected CI run, red/green deny cases, exact spike/OpenShell image scan and SBOM evidence, approved finding policy, and first qualifying release record are linked in the paired ToDo. Daily rescan applies once digests are deployed.

@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openshell-deep-research.invalid/eval/v2/scorer-binding.schema.json",
+  "title": "Matched evaluation signed scorer binding paths",
+  "description": "Untrusted path catalog. Witness and control trust pins come from a separate approved register, never this object.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "approved_corpus_path", "approved_sources_path",
+    "approved_rubric_path", "raw_observations_path", "packet_directory",
+    "candidate_map_path", "blind_reviews_path", "witness_receipt_path",
+    "witness_signature_path", "witness_public_key_path",
+    "control_review_path", "control_signature_path", "control_public_key_path"
+  ],
+  "properties": {
+    "schema_version": {"const": 2},
+    "approved_corpus_path": {"$ref": "#/$defs/absolutePath"},
+    "approved_sources_path": {"$ref": "#/$defs/absolutePath"},
+    "approved_rubric_path": {"$ref": "#/$defs/absolutePath"},
+    "raw_observations_path": {"$ref": "#/$defs/absolutePath"},
+    "packet_directory": {"$ref": "#/$defs/absolutePath"},
+    "candidate_map_path": {"$ref": "#/$defs/absolutePath"},
+    "blind_reviews_path": {"$ref": "#/$defs/absolutePath"},
+    "witness_receipt_path": {"$ref": "#/$defs/absolutePath"},
+    "witness_signature_path": {"$ref": "#/$defs/absolutePath"},
+    "witness_public_key_path": {"$ref": "#/$defs/absolutePath"},
+    "control_review_path": {"$ref": "#/$defs/absolutePath"},
+    "control_signature_path": {"$ref": "#/$defs/absolutePath"},
+    "control_public_key_path": {"$ref": "#/$defs/absolutePath"}
+  },
+  "$defs": {
+    "absolutePath": {"type": "string", "minLength": 2, "pattern": "^/"}
+  }
+}

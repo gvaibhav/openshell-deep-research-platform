@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openshell-deep-research.invalid/eval/v2/concealed-map.schema.json",
+  "title": "Private completed assignments and noncompleted dispositions",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "cell_count", "packet_count", "packet_manifest_sha256", "corpus_digest", "source_pack_digest", "rubric_digest", "assignments", "dispositions"],
+  "properties": {
+    "schema_version": {"const": 2},
+    "cell_count": {"type": "integer", "minimum": 1, "maximum": 240},
+    "packet_count": {"type": "integer", "minimum": 0, "maximum": 128},
+    "packet_manifest_sha256": {"$ref": "#/$defs/digest"},
+    "corpus_digest": {"$ref": "#/$defs/digest"},
+    "source_pack_digest": {"$ref": "#/$defs/digest"},
+    "rubric_digest": {"$ref": "#/$defs/digest"},
+    "assignments": {"type": "array", "maxItems": 128, "items": {"$ref": "#/$defs/assignment"}},
+    "dispositions": {"type": "array", "maxItems": 240, "items": {"$ref": "#/$defs/disposition"}}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "text": {"type": "string", "minLength": 1, "maxLength": 256, "pattern": "\\S"},
+    "metric": {"type": "number", "minimum": 0},
+    "artifact": {
+      "type": "object", "additionalProperties": false,
+      "required": ["ref", "sha256"],
+      "properties": {"ref": {"$ref": "#/$defs/text"}, "sha256": {"$ref": "#/$defs/digest"}}
+    },
+    "screening": {
+      "type": "object", "additionalProperties": false,
+      "required": ["custodian_id", "screened_at", "record_ref", "raw_answer_sha256", "packet_answer_sha256"],
+      "properties": {
+        "custodian_id": {"$ref": "#/$defs/id"},
+        "screened_at": {"type": "string", "format": "date-time"},
+        "record_ref": {"$ref": "#/$defs/text"},
+        "raw_answer_sha256": {"$ref": "#/$defs/digest"},
+        "packet_answer_sha256": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "assignment": {
+      "type": "object", "additionalProperties": false,
+      "required": ["status", "packet_id", "packet_sha256", "case_id", "candidate_id", "run_id", "candidate_version", "model_version", "source_delivery", "answer_artifact_ref", "latency_ms", "cost_usd", "user_effort_minutes", "screening"],
+      "properties": {
+        "status": {"const": "completed"},
+        "packet_id": {"type": "string", "pattern": "^bp-[0-9a-f]{32}$"},
+        "packet_sha256": {"$ref": "#/$defs/digest"},
+        "case_id": {"$ref": "#/$defs/id"},
+        "candidate_id": {"$ref": "#/$defs/id"},
+        "run_id": {"$ref": "#/$defs/id"},
+        "candidate_version": {"$ref": "#/$defs/text"},
+        "model_version": {"$ref": "#/$defs/text"},
+        "source_delivery": {"$ref": "#/$defs/text"},
+        "answer_artifact_ref": {"$ref": "#/$defs/text"},
+        "latency_ms": {"$ref": "#/$defs/metric"},
+        "cost_usd": {"$ref": "#/$defs/metric"},
+        "user_effort_minutes": {"$ref": "#/$defs/metric"},
+        "screening": {"$ref": "#/$defs/screening"}
+      }
+    },
+    "disposition": {
+      "type": "object", "additionalProperties": false,
+      "required": ["case_id", "candidate_id", "status", "reason", "disposition_evidence"],
+      "properties": {
+        "case_id": {"$ref": "#/$defs/id"},
+        "candidate_id": {"$ref": "#/$defs/id"},
+        "status": {"enum": ["deferred", "failed"]},
+        "reason": {"type": "string", "minLength": 1, "maxLength": 2048, "pattern": "\\S"},
+        "disposition_evidence": {"$ref": "#/$defs/artifact"}
+      }
+    }
+  }
+}

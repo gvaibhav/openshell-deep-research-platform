@@ -1,0 +1,290 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openshell-deep-research.invalid/eval/v4/scorecard.schema.json",
+  "title": "Matched research scorecard",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "corpus_id", "corpus_digest", "source_pack_id", "source_pack_digest",
+    "rubric_id", "rubric_digest", "corpus_approved", "rubric_approved", "category_coverage",
+    "permission_profile_id", "case_count", "required_candidates", "missing_candidates",
+    "candidate_run_digests", "candidates", "binding", "custom_quality_margin_points",
+    "decision_readiness", "decision_note"
+  ],
+  "properties": {
+    "schema_version": {"const": 4},
+    "corpus_id": {"type": "string", "minLength": 1},
+    "corpus_digest": {"$ref": "#/$defs/digest"},
+    "source_pack_id": {"type": "string", "minLength": 1},
+    "source_pack_digest": {"$ref": "#/$defs/digest"},
+    "rubric_id": {"type": "string", "minLength": 1},
+    "rubric_digest": {"$ref": "#/$defs/digest"},
+    "corpus_approved": {"type": "boolean"},
+    "rubric_approved": {"type": "boolean"},
+    "category_coverage": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {"$ref": "#/$defs/categoryCoverage"}
+    },
+    "permission_profile_id": {"type": "string", "minLength": 1},
+    "case_count": {"type": "integer", "minimum": 20, "maximum": 30},
+    "required_candidates": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "missing_candidates": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "candidate_run_digests": {"type": "object", "additionalProperties": {"$ref": "#/$defs/digest"}},
+    "candidates": {"type": "object", "additionalProperties": {"$ref": "#/$defs/candidateReport"}},
+    "binding": {"$ref": "#/$defs/binding"},
+    "custom_quality_margin_points": {"type": ["number", "null"]},
+    "decision_readiness": {
+      "enum": ["incomplete", "blocked_by_observed_violation", "blocked_by_quality_threshold", "ready_for_human_decision"]
+    },
+    "decision_note": {"type": "string", "minLength": 1}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"binding": {"properties": {"status": {"const": "missing"}}}}},
+      "then": {"properties": {"decision_readiness": {"const": "incomplete"}}}
+    }
+  ],
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "nonnegative": {"type": "number", "minimum": 0},
+    "nullableNonnegative": {"type": ["number", "null"], "minimum": 0},
+    "score": {"type": "integer", "minimum": 0, "maximum": 4},
+    "binding": {
+      "oneOf": [
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["status", "packet_count"],
+          "properties": {
+            "status": {"const": "missing"},
+            "packet_count": {"const": 0}
+          }
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": [
+            "status", "cell_count", "packet_count", "disposition_count", "packet_manifest_sha256",
+            "candidate_map_sha256", "blind_reviews_sha256", "control_review_sha256",
+            "control_signature_sha256", "witness_receipt_sha256",
+            "raw_observations_sha256", "witness_id", "control_reviewer_id",
+            "witness_public_key_sha256", "control_public_key_sha256"
+          ],
+          "properties": {
+            "status": {"const": "verified_local"},
+            "cell_count": {"type": "integer", "minimum": 1, "maximum": 240},
+            "packet_count": {"type": "integer", "minimum": 0, "maximum": 128},
+            "disposition_count": {"type": "integer", "minimum": 0, "maximum": 240},
+            "packet_manifest_sha256": {"$ref": "#/$defs/digest"},
+            "candidate_map_sha256": {"$ref": "#/$defs/digest"},
+            "blind_reviews_sha256": {"$ref": "#/$defs/digest"},
+            "control_review_sha256": {"$ref": "#/$defs/digest"},
+            "control_signature_sha256": {"$ref": "#/$defs/digest"},
+            "witness_receipt_sha256": {"$ref": "#/$defs/digest"},
+            "raw_observations_sha256": {"$ref": "#/$defs/digest"},
+            "witness_id": {"type": "string", "minLength": 1},
+            "control_reviewer_id": {"type": "string", "minLength": 1},
+            "witness_public_key_sha256": {"$ref": "#/$defs/digest"},
+            "control_public_key_sha256": {"$ref": "#/$defs/digest"}
+          }
+        }
+      ]
+    },
+    "categoryCoverage": {
+      "type": "object", "additionalProperties": false,
+      "required": ["observed", "required"],
+      "properties": {
+        "observed": {"type": "integer", "minimum": 0},
+        "required": {"type": "integer", "minimum": 1}
+      }
+    },
+    "approval": {
+      "type": "object", "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "status": {"enum": ["pending", "approved"]},
+        "reviewer_id": {"type": "string", "minLength": 1},
+        "reviewed_at": {"type": "string", "format": "date-time"}
+      }
+    },
+    "connectorPath": {
+      "type": "object", "additionalProperties": false,
+      "required": ["path_id", "status", "evidence_ref"],
+      "properties": {
+        "path_id": {"type": "string", "minLength": 1},
+        "status": {"enum": ["assessed_supported", "assessed_gap", "unavailable", "deferred", "pending"]},
+        "evidence_ref": {"type": "string", "minLength": 1},
+        "reason": {"type": "string", "minLength": 1}
+      },
+      "if": {"properties": {"status": {"enum": ["assessed_gap", "unavailable", "deferred", "pending"]}}},
+      "then": {"required": ["reason"]}
+    },
+    "control": {
+      "type": "object", "additionalProperties": false,
+      "required": ["status", "evidence_ref"],
+      "properties": {
+        "status": {"enum": ["met", "gap", "not_tested"]},
+        "evidence_ref": {"type": "string", "minLength": 1}
+      }
+    },
+    "citation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["evidence_id", "quote"],
+      "properties": {
+        "evidence_id": {"type": "string", "minLength": 1},
+        "quote": {"type": "string", "minLength": 1}
+      }
+    },
+    "permissionProbe": {
+      "type": "object", "additionalProperties": false,
+      "required": ["probe_id", "subject_id", "target_evidence_id", "outcome", "observed_at", "evidence_ref"],
+      "properties": {
+        "probe_id": {"type": "string", "minLength": 1},
+        "subject_id": {"type": "string", "minLength": 1},
+        "target_evidence_id": {"type": "string", "minLength": 1},
+        "outcome": {"enum": ["denied", "allowed"]},
+        "observed_at": {"type": "string", "format": "date-time"},
+        "evidence_ref": {"type": "string", "minLength": 1}
+      }
+    },
+    "revocationAcknowledgement": {
+      "type": "object", "additionalProperties": false,
+      "required": ["revocation_id", "subject_id", "target_evidence_id", "status", "acknowledged_at", "evidence_ref"],
+      "properties": {
+        "revocation_id": {"type": "string", "minLength": 1},
+        "subject_id": {"type": "string", "minLength": 1},
+        "target_evidence_id": {"type": "string", "minLength": 1},
+        "status": {"const": "acknowledged"},
+        "acknowledged_at": {"type": "string", "format": "date-time"},
+        "evidence_ref": {"type": "string", "minLength": 1}
+      }
+    },
+    "revocationTransition": {
+      "type": "object", "additionalProperties": false,
+      "required": ["pre_probe", "acknowledgement", "post_probe"],
+      "properties": {
+        "pre_probe": {"$ref": "#/$defs/permissionProbe"},
+        "acknowledgement": {"$ref": "#/$defs/revocationAcknowledgement"},
+        "post_probe": {"$ref": "#/$defs/permissionProbe"}
+      }
+    },
+    "caseReview": {
+      "type": "object", "additionalProperties": false,
+      "required": ["reviewer_id", "reviewed_at", "scores", "permission_violation", "prompt_injection_violation", "notes"],
+      "properties": {
+        "reviewer_id": {"type": "string", "minLength": 1},
+        "reviewed_at": {"type": "string", "format": "date-time"},
+        "scores": {
+          "type": "object", "additionalProperties": false, "minProperties": 1,
+          "properties": {
+            "factual_accuracy": {"$ref": "#/$defs/score"},
+            "citation_support": {"$ref": "#/$defs/score"},
+            "completeness": {"$ref": "#/$defs/score"},
+            "abstention": {"$ref": "#/$defs/score"},
+            "permission_behavior": {"$ref": "#/$defs/score"},
+            "prompt_injection_resistance": {"$ref": "#/$defs/score"},
+            "user_experience": {"$ref": "#/$defs/score"}
+          }
+        },
+        "permission_violation": {"type": "boolean"},
+        "prompt_injection_violation": {"type": "boolean"},
+        "notes": {"type": "string"}
+      }
+    },
+    "completedCase": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "status", "run_id", "answer_artifact_ref", "observed_behavior", "citations",
+        "latency_ms", "cost_usd", "user_effort_minutes", "raw_review_quality", "quality",
+        "quality_sentinel_failures", "prompt_injection_sentinel_failure",
+        "permission_violation", "permission_probe", "allowed_probe", "revocation_transition", "review"
+      ],
+      "properties": {
+        "status": {"const": "completed"},
+        "run_id": {"type": "string", "minLength": 1},
+        "answer_artifact_ref": {"type": "string", "minLength": 1},
+        "observed_behavior": {"enum": ["answer", "abstained", "denied"]},
+        "citations": {"type": "array", "items": {"$ref": "#/$defs/citation"}},
+        "latency_ms": {"$ref": "#/$defs/nonnegative"},
+        "cost_usd": {"$ref": "#/$defs/nonnegative"},
+        "user_effort_minutes": {"$ref": "#/$defs/nonnegative"},
+        "raw_review_quality": {"type": "number", "minimum": 0, "maximum": 100},
+        "quality": {"type": "number", "minimum": 0, "maximum": 100},
+        "quality_sentinel_failures": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "prompt_injection_sentinel_failure": {"type": "boolean"},
+        "permission_violation": {"type": "boolean"},
+        "permission_probe": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/permissionProbe"}]},
+        "allowed_probe": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/permissionProbe"}]},
+        "revocation_transition": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/revocationTransition"}]},
+        "review": {"$ref": "#/$defs/caseReview"}
+      }
+    },
+    "deferredCase": {
+      "type": "object", "additionalProperties": false,
+      "required": ["status", "reason"],
+      "properties": {
+        "status": {"enum": ["deferred", "failed"]},
+        "reason": {"type": "string", "minLength": 1, "maxLength": 2048}
+      }
+    },
+    "candidateReport": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "candidate_version", "tenant_entitlement", "entitlement_evidence_ref", "entitlement_review",
+        "deployment_mode", "source_delivery", "connector_paths", "control_coverage",
+        "source_pack_digest", "corpus_digest", "rubric_digest", "permission_profile_id",
+        "completed_cases", "missing_cases", "deferred_cases", "failed_cases",
+        "permission_violations", "permission_threshold_met", "quality_sentinel_failures",
+        "quality_sentinel_case_ids", "prompt_injection_sentinel_failures",
+        "prompt_injection_sentinel_case_ids", "mean_quality", "mean_latency_ms",
+        "p95_latency_ms", "total_cost_usd", "total_user_effort_minutes",
+        "quality_threshold_met", "run_ids", "cases"
+      ],
+      "properties": {
+        "candidate_version": {"type": "string", "minLength": 1},
+        "tenant_entitlement": {"type": "string", "minLength": 1},
+        "entitlement_evidence_ref": {"type": "string", "minLength": 1},
+        "entitlement_review": {"$ref": "#/$defs/approval"},
+        "deployment_mode": {"type": "string", "minLength": 1},
+        "source_delivery": {"type": "string", "minLength": 1},
+        "connector_paths": {"type": "array", "items": {"$ref": "#/$defs/connectorPath"}},
+        "control_coverage": {
+          "type": "object", "additionalProperties": false,
+          "required": [
+            "server_held_job_policy", "source_credential_broker",
+            "separate_public_private_lanes", "durable_claim_to_source_evidence"
+          ],
+          "properties": {
+            "server_held_job_policy": {"$ref": "#/$defs/control"},
+            "source_credential_broker": {"$ref": "#/$defs/control"},
+            "separate_public_private_lanes": {"$ref": "#/$defs/control"},
+            "durable_claim_to_source_evidence": {"$ref": "#/$defs/control"}
+          }
+        },
+        "source_pack_digest": {"$ref": "#/$defs/digest"},
+        "corpus_digest": {"$ref": "#/$defs/digest"},
+        "rubric_digest": {"$ref": "#/$defs/digest"},
+        "permission_profile_id": {"type": "string", "minLength": 1},
+        "completed_cases": {"type": "integer", "minimum": 0},
+        "missing_cases": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+        "deferred_cases": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+        "failed_cases": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+        "permission_violations": {"type": "integer", "minimum": 0},
+        "permission_threshold_met": {"type": "boolean"},
+        "quality_sentinel_failures": {"type": "integer", "minimum": 0},
+        "quality_sentinel_case_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "prompt_injection_sentinel_failures": {"type": "integer", "minimum": 0},
+        "prompt_injection_sentinel_case_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "mean_quality": {"$ref": "#/$defs/nullableNonnegative"},
+        "mean_latency_ms": {"$ref": "#/$defs/nullableNonnegative"},
+        "p95_latency_ms": {"$ref": "#/$defs/nullableNonnegative"},
+        "total_cost_usd": {"$ref": "#/$defs/nonnegative"},
+        "total_user_effort_minutes": {"$ref": "#/$defs/nonnegative"},
+        "quality_threshold_met": {"type": "boolean"},
+        "run_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+        "cases": {"type": "object", "additionalProperties": {"oneOf": [
+          {"$ref": "#/$defs/completedCase"}, {"$ref": "#/$defs/deferredCase"}
+        ]}}
+      }
+    }
+  }
+}
